@@ -53,6 +53,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       defaultAction: 'Allow'
     }
     disableLocalAuth: false
+    allowProjectManagement: true  // Required for Foundry Project creation
   }
 }
 
