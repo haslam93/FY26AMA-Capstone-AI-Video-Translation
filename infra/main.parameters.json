@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "deploymentNumber": {
+      "value": 1
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "tags": {
+      "value": {
+        "project": "VideoTranslation",
+        "environment": "AMA-Capstone",
+        "owner": "Hammad Aslam",
+        "costCenter": "Training-FY26"
+      }
+    }
+  }
+}

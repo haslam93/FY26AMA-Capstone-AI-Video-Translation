@@ -1,0 +1,145 @@
+﻿@page "/"
+@inject ITranslationApiService ApiService
+@inject NavigationManager Navigation
+
+<PageTitle>Video Translation Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="bi bi-translate"></i> Video Translation Service</h1>
+            <p class="lead">Translate videos to different languages using Azure AI Speech</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary btn-lg" @onclick="NavigateToCreate">
+                <i class="bi bi-plus-circle"></i> New Translation
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @error
+        </div>
+    }
+    else if (jobs == null || jobs.Count == 0)
+    {
+        <div class="card text-center py-5">
+            <div class="card-body">
+                <i class="bi bi-film display-1 text-muted"></i>
+                <h3 class="mt-3">No translation jobs yet</h3>
+                <p class="text-muted">Start by creating your first video translation job</p>
+                <button class="btn btn-primary" @onclick="NavigateToCreate">
+                    Create Translation Job
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col">
+                <h4 class="mb-3">Recent Jobs</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Job ID</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var job in jobs)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="/jobs/@job.JobId">@job.JobId</a>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(job.Status)">
+                                            @job.Status
+                                        </span>
+                                    </td>
+                                    <td>@job.CreatedAt.ToString("g")</td>
+                                    <td>@job.LastUpdatedAt.ToString("g")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                @onclick="() => ViewJob(job.JobId)">
+                                            <i class="bi bi-eye"></i> View
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<JobSummary>? jobs;
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJobs();
+    }
+
+    private async Task LoadJobs()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            var response = await ApiService.ListJobsAsync();
+            jobs = response?.Jobs ?? new List<JobSummary>();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load jobs: {ex.Message}";
+            jobs = new List<JobSummary>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void NavigateToCreate()
+    {
+        Navigation.NavigateTo("/create");
+    }
+
+    private void ViewJob(string jobId)
+    {
+        Navigation.NavigateTo($"/jobs/{jobId}");
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "submitted" => "bg-secondary",
+            "processing" or "validating" or "creatingtranslation" or "creatingiteration" => "bg-info",
+            "completed" => "bg-success",
+            "failed" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

@@ -1,0 +1,21 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 bg-primary text-white">
+            <span class="fw-bold">Video Translation Service</span>
+            <a href="https://learn.microsoft.com/azure/ai-services/speech-service/video-translation-overview" 
+               target="_blank" class="text-white ms-auto">
+                <i class="bi bi-book"></i> Documentation
+            </a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>

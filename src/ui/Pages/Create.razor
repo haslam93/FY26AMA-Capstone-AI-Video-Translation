@@ -1,0 +1,541 @@
+@page "/create"
+@inject ITranslationApiService ApiService
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Create Translation Job</PageTitle>
+
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Create Job</li>
+        </ol>
+    </nav>
+
+    <h1 class="mb-4">
+        <i class="bi bi-plus-circle"></i> Create Translation Job
+    </h1>
+
+    @if (submitted)
+    {
+        <div class="alert alert-success" role="alert">
+            <h4 class="alert-heading"><i class="bi bi-check-circle"></i> Job Created!</h4>
+            <p>Your translation job has been submitted successfully.</p>
+            <hr>
+            <p class="mb-0">
+                Job ID: <strong>@createdJobId</strong>
+                <button class="btn btn-sm btn-success ms-2" @onclick="ViewCreatedJob">
+                    View Job Status
+                </button>
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Video Details</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="@jobRequest" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Display Name (optional)</label>
+                        <InputText class="form-control" @bind-Value="jobRequest.DisplayName" 
+                                   placeholder="My Translation Job" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Video Source</label>
+                        <div class="btn-group d-block mb-2" role="group">
+                            <button type="button" class="btn @(inputType == "upload" ? "btn-primary" : "btn-outline-primary")"
+                                    @onclick="SetInputTypeUpload">
+                                <i class="bi bi-upload"></i> Upload File
+                            </button>
+                            <button type="button" class="btn @(inputType == "url" ? "btn-primary" : "btn-outline-primary")"
+                                    @onclick="SetInputTypeUrl">
+                                <i class="bi bi-link-45deg"></i> URL
+                            </button>
+                            <button type="button" class="btn @(inputType == "blob" ? "btn-primary" : "btn-outline-primary")"
+                                    @onclick="SetInputTypeBlob">
+                                <i class="bi bi-cloud"></i> Blob Storage
+                            </button>
+                        </div>
+
+                        @if (inputType == "upload")
+                        {
+                            <div class="mb-2">
+                                <InputFile class="form-control" OnChange="HandleFileSelected" accept=".mp4,.webm,.mov,.avi,.mkv,.wmv" />
+                                <div class="form-text">Select a video file (MP4, WebM, MOV, AVI, MKV, WMV - max 500MB)</div>
+                            </div>
+                            
+                            @if (selectedFile != null)
+                            {
+                                <div class="alert alert-info py-2">
+                                    <i class="bi bi-film"></i> <strong>@selectedFile.Name</strong> 
+                                    (@FormatFileSize(selectedFile.Size))
+                                    @if (uploadProgress > 0 && uploadProgress < 100)
+                                    {
+                                        <div class="progress mt-2" style="height: 20px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 role="progressbar" style="width: @uploadProgress%"
+                                                 aria-valuenow="@uploadProgress" aria-valuemin="0" aria-valuemax="100">
+                                                @uploadProgress%
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (uploadComplete)
+                                    {
+                                        <span class="badge bg-success ms-2"><i class="bi bi-check"></i> Uploaded</span>
+                                    }
+                                </div>
+                            }
+                        }
+                        else if (inputType == "url")
+                        {
+                            <InputText class="form-control" @bind-Value="jobRequest.VideoUrl" 
+                                       placeholder="https://example.com/video.mp4" />
+                            <div class="form-text">Enter the direct URL to your video file (must be publicly accessible)</div>
+                        }
+                        else
+                        {
+                            <InputText class="form-control" @bind-Value="jobRequest.BlobPath" 
+                                       placeholder="videos/my-video.mp4" />
+                            <div class="form-text">Enter the path to your video in blob storage (container/path)</div>
+                        }
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Source Language</label>
+                            <InputSelect class="form-select" @bind-Value="jobRequest.SourceLocale">
+                                @foreach (var locale in sourceLocales)
+                                {
+                                    <option value="@locale.Code">@locale.Name</option>
+                                }
+                            </InputSelect>
+                            <div class="form-text">Select the language spoken in the video</div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Target Language</label>
+                            <InputSelect class="form-select" @bind-Value="jobRequest.TargetLocale">
+                                @foreach (var locale in targetLocales)
+                                {
+                                    <option value="@locale.Code">@locale.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Voice Kind</label>
+                            <InputSelect class="form-select" @bind-Value="jobRequest.VoiceKind">
+                                <option value="PersonalVoice">Personal Voice (Clone speaker voice)</option>
+                                <option value="PlatformVoice">Platform Voice (Standard TTS)</option>
+                            </InputSelect>
+                            <div class="form-text">Personal Voice attempts to clone the original speaker's voice</div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Number of Speakers (optional)</label>
+                            <InputNumber class="form-control" @bind-Value="jobRequest.SpeakerCount" 
+                                         min="1" max="10" placeholder="Auto-detect" />
+                            <div class="form-text">Leave empty for auto-detection</div>
+                        </div>
+                    </div>
+
+                    @if (submitError != null)
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> @submitError
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@(submitting || uploading)">
+                            @if (uploading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Uploading...</span>
+                            }
+                            else if (submitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Submitting...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-play-fill"></i>
+                                <span>Start Translation</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CreateJobRequest jobRequest = new();
+    private string inputType = "upload";
+    private bool submitting = false;
+    private bool uploading = false;
+    private bool submitted = false;
+    private bool uploadComplete = false;
+    private int uploadProgress = 0;
+    private string? submitError;
+    private string? createdJobId;
+    private IBrowserFile? selectedFile;
+    private string? uploadedBlobPath;
+
+    private List<SupportedLocale> sourceLocales = new()
+    {
+        // English
+        new() { Code = "en-US", Name = "English (US)" },
+        new() { Code = "en-GB", Name = "English (UK)" },
+        new() { Code = "en-AU", Name = "English (Australia)" },
+        new() { Code = "en-CA", Name = "English (Canada)" },
+        new() { Code = "en-IN", Name = "English (India)" },
+        new() { Code = "en-IE", Name = "English (Ireland)" },
+        new() { Code = "en-NZ", Name = "English (New Zealand)" },
+        new() { Code = "en-SG", Name = "English (Singapore)" },
+        new() { Code = "en-ZA", Name = "English (South Africa)" },
+        new() { Code = "en-HK", Name = "English (Hong Kong)" },
+        new() { Code = "en-KE", Name = "English (Kenya)" },
+        new() { Code = "en-NG", Name = "English (Nigeria)" },
+        new() { Code = "en-PH", Name = "English (Philippines)" },
+        new() { Code = "en-TZ", Name = "English (Tanzania)" },
+        // Arabic
+        new() { Code = "ar-SA", Name = "Arabic (Saudi Arabia)" },
+        new() { Code = "ar-EG", Name = "Arabic (Egypt)" },
+        new() { Code = "ar-AE", Name = "Arabic (UAE)" },
+        new() { Code = "ar-BH", Name = "Arabic (Bahrain)" },
+        new() { Code = "ar-DZ", Name = "Arabic (Algeria)" },
+        new() { Code = "ar-IQ", Name = "Arabic (Iraq)" },
+        new() { Code = "ar-JO", Name = "Arabic (Jordan)" },
+        new() { Code = "ar-KW", Name = "Arabic (Kuwait)" },
+        new() { Code = "ar-LB", Name = "Arabic (Lebanon)" },
+        new() { Code = "ar-LY", Name = "Arabic (Libya)" },
+        new() { Code = "ar-MA", Name = "Arabic (Morocco)" },
+        new() { Code = "ar-OM", Name = "Arabic (Oman)" },
+        new() { Code = "ar-QA", Name = "Arabic (Qatar)" },
+        new() { Code = "ar-SY", Name = "Arabic (Syria)" },
+        new() { Code = "ar-TN", Name = "Arabic (Tunisia)" },
+        new() { Code = "ar-YE", Name = "Arabic (Yemen)" },
+        // Chinese
+        new() { Code = "zh-CN", Name = "Chinese (Simplified)" },
+        new() { Code = "zh-TW", Name = "Chinese (Traditional)" },
+        new() { Code = "zh-HK", Name = "Chinese (Cantonese)" },
+        // European Languages
+        new() { Code = "de-DE", Name = "German (Germany)" },
+        new() { Code = "de-AT", Name = "German (Austria)" },
+        new() { Code = "de-CH", Name = "German (Switzerland)" },
+        new() { Code = "fr-FR", Name = "French (France)" },
+        new() { Code = "fr-CA", Name = "French (Canada)" },
+        new() { Code = "fr-BE", Name = "French (Belgium)" },
+        new() { Code = "fr-CH", Name = "French (Switzerland)" },
+        new() { Code = "es-ES", Name = "Spanish (Spain)" },
+        new() { Code = "es-MX", Name = "Spanish (Mexico)" },
+        new() { Code = "es-AR", Name = "Spanish (Argentina)" },
+        new() { Code = "es-CO", Name = "Spanish (Colombia)" },
+        new() { Code = "it-IT", Name = "Italian" },
+        new() { Code = "pt-BR", Name = "Portuguese (Brazil)" },
+        new() { Code = "pt-PT", Name = "Portuguese (Portugal)" },
+        new() { Code = "nl-NL", Name = "Dutch (Netherlands)" },
+        new() { Code = "nl-BE", Name = "Dutch (Belgium)" },
+        new() { Code = "pl-PL", Name = "Polish" },
+        new() { Code = "ru-RU", Name = "Russian" },
+        new() { Code = "uk-UA", Name = "Ukrainian" },
+        new() { Code = "cs-CZ", Name = "Czech" },
+        new() { Code = "da-DK", Name = "Danish" },
+        new() { Code = "fi-FI", Name = "Finnish" },
+        new() { Code = "el-GR", Name = "Greek" },
+        new() { Code = "hu-HU", Name = "Hungarian" },
+        new() { Code = "nb-NO", Name = "Norwegian" },
+        new() { Code = "ro-RO", Name = "Romanian" },
+        new() { Code = "sk-SK", Name = "Slovak" },
+        new() { Code = "sl-SI", Name = "Slovenian" },
+        new() { Code = "sv-SE", Name = "Swedish" },
+        new() { Code = "bg-BG", Name = "Bulgarian" },
+        new() { Code = "hr-HR", Name = "Croatian" },
+        new() { Code = "et-EE", Name = "Estonian" },
+        new() { Code = "lv-LV", Name = "Latvian" },
+        new() { Code = "lt-LT", Name = "Lithuanian" },
+        new() { Code = "sr-RS", Name = "Serbian" },
+        new() { Code = "ca-ES", Name = "Catalan" },
+        new() { Code = "eu-ES", Name = "Basque" },
+        new() { Code = "gl-ES", Name = "Galician" },
+        new() { Code = "cy-GB", Name = "Welsh" },
+        new() { Code = "ga-IE", Name = "Irish" },
+        new() { Code = "is-IS", Name = "Icelandic" },
+        new() { Code = "mt-MT", Name = "Maltese" },
+        new() { Code = "sq-AL", Name = "Albanian" },
+        new() { Code = "bs-BA", Name = "Bosnian" },
+        new() { Code = "mk-MK", Name = "Macedonian" },
+        // Asian Languages
+        new() { Code = "ja-JP", Name = "Japanese" },
+        new() { Code = "ko-KR", Name = "Korean" },
+        new() { Code = "hi-IN", Name = "Hindi" },
+        new() { Code = "th-TH", Name = "Thai" },
+        new() { Code = "vi-VN", Name = "Vietnamese" },
+        new() { Code = "id-ID", Name = "Indonesian" },
+        new() { Code = "ms-MY", Name = "Malay" },
+        new() { Code = "fil-PH", Name = "Filipino" },
+        new() { Code = "ta-IN", Name = "Tamil" },
+        new() { Code = "te-IN", Name = "Telugu" },
+        new() { Code = "bn-IN", Name = "Bengali" },
+        new() { Code = "gu-IN", Name = "Gujarati" },
+        new() { Code = "kn-IN", Name = "Kannada" },
+        new() { Code = "ml-IN", Name = "Malayalam" },
+        new() { Code = "mr-IN", Name = "Marathi" },
+        new() { Code = "jv-ID", Name = "Javanese" },
+        new() { Code = "km-KH", Name = "Khmer" },
+        new() { Code = "lo-LA", Name = "Lao" },
+        new() { Code = "my-MM", Name = "Burmese" },
+        new() { Code = "ne-NP", Name = "Nepali" },
+        new() { Code = "si-LK", Name = "Sinhala" },
+        new() { Code = "mn-MN", Name = "Mongolian" },
+        new() { Code = "kk-KZ", Name = "Kazakh" },
+        new() { Code = "uz-UZ", Name = "Uzbek" },
+        new() { Code = "az-AZ", Name = "Azerbaijani" },
+        new() { Code = "hy-AM", Name = "Armenian" },
+        new() { Code = "ka-GE", Name = "Georgian" },
+        // Middle Eastern & African
+        new() { Code = "he-IL", Name = "Hebrew" },
+        new() { Code = "tr-TR", Name = "Turkish" },
+        new() { Code = "fa-IR", Name = "Persian" },
+        new() { Code = "ps-AF", Name = "Pashto" },
+        new() { Code = "af-ZA", Name = "Afrikaans" },
+        new() { Code = "am-ET", Name = "Amharic" },
+        new() { Code = "sw-KE", Name = "Swahili (Kenya)" },
+        new() { Code = "sw-TZ", Name = "Swahili (Tanzania)" },
+        new() { Code = "so-SO", Name = "Somali" },
+        new() { Code = "su-ID", Name = "Sundanese" },
+        new() { Code = "yue-CN", Name = "Chinese (Cantonese Simplified)" }
+    };
+
+    private List<SupportedLocale> targetLocales = new()
+    {
+        // English
+        new() { Code = "en-US", Name = "English (US)" },
+        new() { Code = "en-GB", Name = "English (UK)" },
+        new() { Code = "en-AU", Name = "English (Australia)" },
+        new() { Code = "en-CA", Name = "English (Canada)" },
+        new() { Code = "en-IN", Name = "English (India)" },
+        new() { Code = "en-IE", Name = "English (Ireland)" },
+        // Arabic
+        new() { Code = "ar-SA", Name = "Arabic (Saudi Arabia)" },
+        new() { Code = "ar-EG", Name = "Arabic (Egypt)" },
+        new() { Code = "ar-AE", Name = "Arabic (UAE)" },
+        // Chinese
+        new() { Code = "zh-CN", Name = "Chinese (Simplified)" },
+        new() { Code = "zh-TW", Name = "Chinese (Traditional)" },
+        new() { Code = "zh-HK", Name = "Chinese (Cantonese)" },
+        // European Languages
+        new() { Code = "de-DE", Name = "German (Germany)" },
+        new() { Code = "de-AT", Name = "German (Austria)" },
+        new() { Code = "de-CH", Name = "German (Switzerland)" },
+        new() { Code = "fr-FR", Name = "French (France)" },
+        new() { Code = "fr-CA", Name = "French (Canada)" },
+        new() { Code = "fr-BE", Name = "French (Belgium)" },
+        new() { Code = "es-ES", Name = "Spanish (Spain)" },
+        new() { Code = "es-MX", Name = "Spanish (Mexico)" },
+        new() { Code = "es-AR", Name = "Spanish (Argentina)" },
+        new() { Code = "it-IT", Name = "Italian" },
+        new() { Code = "pt-BR", Name = "Portuguese (Brazil)" },
+        new() { Code = "pt-PT", Name = "Portuguese (Portugal)" },
+        new() { Code = "nl-NL", Name = "Dutch (Netherlands)" },
+        new() { Code = "pl-PL", Name = "Polish" },
+        new() { Code = "ru-RU", Name = "Russian" },
+        new() { Code = "uk-UA", Name = "Ukrainian" },
+        new() { Code = "cs-CZ", Name = "Czech" },
+        new() { Code = "da-DK", Name = "Danish" },
+        new() { Code = "fi-FI", Name = "Finnish" },
+        new() { Code = "el-GR", Name = "Greek" },
+        new() { Code = "hu-HU", Name = "Hungarian" },
+        new() { Code = "nb-NO", Name = "Norwegian" },
+        new() { Code = "ro-RO", Name = "Romanian" },
+        new() { Code = "sk-SK", Name = "Slovak" },
+        new() { Code = "sl-SI", Name = "Slovenian" },
+        new() { Code = "sv-SE", Name = "Swedish" },
+        new() { Code = "bg-BG", Name = "Bulgarian" },
+        new() { Code = "hr-HR", Name = "Croatian" },
+        new() { Code = "ca-ES", Name = "Catalan" },
+        // Asian Languages
+        new() { Code = "ja-JP", Name = "Japanese" },
+        new() { Code = "ko-KR", Name = "Korean" },
+        new() { Code = "hi-IN", Name = "Hindi" },
+        new() { Code = "th-TH", Name = "Thai" },
+        new() { Code = "vi-VN", Name = "Vietnamese" },
+        new() { Code = "id-ID", Name = "Indonesian" },
+        new() { Code = "ms-MY", Name = "Malay" },
+        new() { Code = "fil-PH", Name = "Filipino" },
+        new() { Code = "ta-IN", Name = "Tamil" },
+        new() { Code = "te-IN", Name = "Telugu" },
+        new() { Code = "bn-IN", Name = "Bengali" },
+        new() { Code = "jv-ID", Name = "Javanese" },
+        // Middle Eastern & African
+        new() { Code = "he-IL", Name = "Hebrew" },
+        new() { Code = "tr-TR", Name = "Turkish" },
+        new() { Code = "af-ZA", Name = "Afrikaans" },
+        new() { Code = "am-ET", Name = "Amharic" },
+        new() { Code = "sw-KE", Name = "Swahili" }
+    };
+
+    private void SetInputTypeUpload()
+    {
+        inputType = "upload";
+        uploadComplete = false;
+        uploadProgress = 0;
+    }
+
+    private void SetInputTypeUrl()
+    {
+        inputType = "url";
+    }
+
+    private void SetInputTypeBlob()
+    {
+        inputType = "blob";
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadComplete = false;
+        uploadProgress = 0;
+        uploadedBlobPath = null;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private async Task HandleSubmit()
+    {
+        submitting = true;
+        submitError = null;
+
+        try
+        {
+            // Handle file upload if needed
+            if (inputType == "upload")
+            {
+                if (selectedFile == null)
+                {
+                    submitError = "Please select a video file to upload.";
+                    submitting = false;
+                    return;
+                }
+
+                // Check file size (max 500MB)
+                if (selectedFile.Size > 500 * 1024 * 1024)
+                {
+                    submitError = "File size exceeds 500MB limit.";
+                    submitting = false;
+                    return;
+                }
+
+                // Upload if not already uploaded
+                if (!uploadComplete)
+                {
+                    uploading = true;
+                    uploadProgress = 10;
+                    StateHasChanged();
+
+                    try
+                    {
+                        using var stream = selectedFile.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+                        var uploadResult = await ApiService.UploadVideoAsync(stream, selectedFile.Name);
+                        
+                        if (uploadResult != null)
+                        {
+                            uploadedBlobPath = uploadResult.BlobPath;
+                            uploadComplete = true;
+                            uploadProgress = 100;
+                        }
+                        else
+                        {
+                            submitError = "Failed to upload video. Please try again.";
+                            uploading = false;
+                            submitting = false;
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        submitError = $"Upload failed: {ex.Message}";
+                        uploading = false;
+                        submitting = false;
+                        return;
+                    }
+                    finally
+                    {
+                        uploading = false;
+                    }
+                }
+
+                jobRequest.BlobPath = uploadedBlobPath;
+                jobRequest.VideoUrl = null;
+            }
+            else if (inputType == "url")
+            {
+                jobRequest.BlobPath = null;
+            }
+            else
+            {
+                jobRequest.VideoUrl = null;
+            }
+
+            var response = await ApiService.CreateJobAsync(jobRequest);
+            if (response != null)
+            {
+                createdJobId = response.JobId;
+                submitted = true;
+            }
+            else
+            {
+                submitError = "Failed to create job. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            submitError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private void ViewCreatedJob()
+    {
+        if (createdJobId != null)
+        {
+            Navigation.NavigateTo($"/jobs/{createdJobId}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/");
+    }
+}

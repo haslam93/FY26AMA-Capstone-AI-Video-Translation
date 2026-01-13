@@ -1,0 +1,141 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION_API: '8.0.x'
+  DOTNET_VERSION_UI: '9.0.x'
+
+jobs:
+  # ============================================================================
+  # Validate Infrastructure (Bicep)
+  # ============================================================================
+  validate-infra:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az version
+
+      - name: Validate Bicep syntax
+        run: |
+          echo "🔍 Validating Bicep files..."
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          echo "✅ Bicep validation successful"
+
+      - name: Validate Bicep modules
+        run: |
+          echo "🔍 Validating Bicep modules..."
+          for file in infra/modules/*.bicep; do
+            echo "  Validating: $file"
+            az bicep build --file "$file" --stdout > /dev/null
+          done
+          echo "✅ All Bicep modules valid"
+
+  # ============================================================================
+  # Build and Test API
+  # ============================================================================
+  build-api:
+    name: Build & Test API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Api
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION_API }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION_API }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run API unit tests
+        working-directory: tests/unit/VideoTranslation.Api.Tests
+        run: |
+          dotnet restore
+          dotnet test --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: tests/unit/VideoTranslation.Api.Tests/TestResults/*.trx
+
+  # ============================================================================
+  # Build and Test UI
+  # ============================================================================
+  build-ui:
+    name: Build & Test UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/ui
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION_UI }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION_UI }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run UI unit tests
+        working-directory: tests/unit/VideoTranslation.UI.Tests
+        run: |
+          dotnet restore
+          dotnet test --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-test-results
+          path: tests/unit/VideoTranslation.UI.Tests/TestResults/*.trx
+
+  # ============================================================================
+  # CI Summary
+  # ============================================================================
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [validate-infra, build-api, build-ui]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "## CI Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure | ${{ needs.validate-infra.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.build-api.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI | ${{ needs.build-ui.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure')
+        run: exit 1

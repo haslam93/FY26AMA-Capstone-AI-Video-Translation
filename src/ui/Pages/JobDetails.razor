@@ -1,0 +1,279 @@
+@page "/jobs/{JobId}"
+@inject ITranslationApiService ApiService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Job Details - @JobId</PageTitle>
+
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Job @JobId</li>
+        </ol>
+    </nav>
+
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @error
+            <button class="btn btn-sm btn-outline-danger ms-2" @onclick="LoadJob">
+                Retry
+            </button>
+        </div>
+    }
+    else if (job != null)
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-film"></i> @(job.DisplayName ?? $"Job {job.JobId}")
+                        </h5>
+                        <span class="badge @GetStatusBadgeClass(job.Status) fs-6">
+                            @job.Status
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-sm-3 text-muted">Job ID:</div>
+                            <div class="col-sm-9"><code>@job.JobId</code></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-3 text-muted">Status:</div>
+                            <div class="col-sm-9">
+                                @job.StatusMessage
+                                @if (IsProcessing)
+                                {
+                                    <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                                }
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-3 text-muted">Languages:</div>
+                            <div class="col-sm-9">
+                                <span class="badge bg-secondary">@job.SourceLocale</span>
+                                <i class="bi bi-arrow-right mx-2"></i>
+                                <span class="badge bg-primary">@job.TargetLocale</span>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-3 text-muted">Iteration:</div>
+                            <div class="col-sm-9">@(job.IterationNumber + 1)</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-3 text-muted">Created:</div>
+                            <div class="col-sm-9">@job.CreatedAt.ToString("F")</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-3 text-muted">Updated:</div>
+                            <div class="col-sm-9">@job.LastUpdatedAt.ToString("F")</div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(job.Error))
+                {
+                    <div class="card border-danger mb-4">
+                        <div class="card-header bg-danger text-white">
+                            <i class="bi bi-exclamation-triangle"></i> Error Details
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-0">@job.Error</p>
+                        </div>
+                    </div>
+                }
+
+                @if (job.Result != null && job.Status == "Completed")
+                {
+                    <div class="card border-success mb-4">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-check-circle"></i> Translation Complete - Download Outputs
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group">
+                                @if (!string.IsNullOrEmpty(job.Result.TranslatedVideoUrl))
+                                {
+                                    <a href="@job.Result.TranslatedVideoUrl" target="_blank" 
+                                       class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <i class="bi bi-film me-3 fs-4"></i>
+                                        <div>
+                                            <h6 class="mb-0">Translated Video</h6>
+                                            <small class="text-muted">Video with translated audio</small>
+                                        </div>
+                                        <i class="bi bi-download ms-auto"></i>
+                                    </a>
+                                }
+                                @if (!string.IsNullOrEmpty(job.Result.SourceWebVttUrl))
+                                {
+                                    <a href="@job.Result.SourceWebVttUrl" target="_blank" 
+                                       class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <i class="bi bi-file-text me-3 fs-4"></i>
+                                        <div>
+                                            <h6 class="mb-0">Source Subtitles (WebVTT)</h6>
+                                            <small class="text-muted">Original language captions</small>
+                                        </div>
+                                        <i class="bi bi-download ms-auto"></i>
+                                    </a>
+                                }
+                                @if (!string.IsNullOrEmpty(job.Result.TargetWebVttUrl))
+                                {
+                                    <a href="@job.Result.TargetWebVttUrl" target="_blank" 
+                                       class="list-group-item list-group-item-action d-flex align-items-center">
+                                        <i class="bi bi-file-text me-3 fs-4"></i>
+                                        <div>
+                                            <h6 class="mb-0">Translated Subtitles (WebVTT)</h6>
+                                            <small class="text-muted">Target language captions</small>
+                                        </div>
+                                        <i class="bi bi-download ms-auto"></i>
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" @onclick="LoadJob" disabled="@loading">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                            </button>
+                            @if (autoRefresh && IsProcessing)
+                            {
+                                <button class="btn btn-outline-secondary" @onclick="StopAutoRefresh">
+                                    <i class="bi bi-pause"></i> Stop Auto-Refresh
+                                </button>
+                            }
+                            else if (IsProcessing)
+                            {
+                                <button class="btn btn-outline-success" @onclick="StartAutoRefresh">
+                                    <i class="bi bi-play"></i> Auto-Refresh
+                                </button>
+                            }
+                            <button class="btn btn-outline-secondary" @onclick="GoBack">
+                                <i class="bi bi-arrow-left"></i> Back to Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @if (autoRefresh)
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Auto-refreshing every 10 seconds...
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string JobId { get; set; } = string.Empty;
+
+    private JobStatusResponse? job;
+    private bool loading = true;
+    private string? error;
+    private bool autoRefresh = false;
+    private Timer? refreshTimer;
+
+    private bool IsProcessing => job?.Status != null && 
+        !job.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) &&
+        !job.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJob();
+        
+        // Auto-start refresh if processing
+        if (IsProcessing)
+        {
+            StartAutoRefresh();
+        }
+    }
+
+    private async Task LoadJob()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            job = await ApiService.GetJobStatusAsync(JobId);
+            if (job == null)
+            {
+                error = "Job not found";
+            }
+            else if (!IsProcessing && autoRefresh)
+            {
+                StopAutoRefresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load job: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void StartAutoRefresh()
+    {
+        autoRefresh = true;
+        refreshTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadJob();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private void StopAutoRefresh()
+    {
+        autoRefresh = false;
+        refreshTimer?.Dispose();
+        refreshTimer = null;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "submitted" => "bg-secondary",
+            "processing" or "validating" or "creatingtranslation" or "creatingiteration" or "copyingoutputs" => "bg-info",
+            "completed" => "bg-success",
+            "failed" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+}
