@@ -12,6 +12,9 @@ public interface ITranslationApiService
     Task<CreateJobResponse?> CreateJobAsync(CreateJobRequest request);
     Task<JobStatusResponse?> GetJobStatusAsync(string jobId);
     Task<JobListResponse?> ListJobsAsync();
+    Task<PendingApprovalsResponse?> GetPendingApprovalsAsync();
+    Task<ApproveRejectResponse?> ApproveJobAsync(string jobId, string? reviewedBy = null, string? comments = null);
+    Task<ApproveRejectResponse?> RejectJobAsync(string jobId, string? reviewedBy = null, string? reason = null, string? comments = null);
     Task<UploadResponse?> UploadVideoAsync(Stream fileStream, string fileName, IProgress<int>? progress = null);
     Task<ValidationResponse?> ValidateSubtitlesAsync(string jobId);
 }
@@ -43,6 +46,27 @@ public class TranslationApiService : ITranslationApiService
     public async Task<JobListResponse?> ListJobsAsync()
     {
         return await _httpClient.GetFromJsonAsync<JobListResponse>("api/jobs");
+    }
+
+    public async Task<PendingApprovalsResponse?> GetPendingApprovalsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<PendingApprovalsResponse>("api/jobs/pending");
+    }
+
+    public async Task<ApproveRejectResponse?> ApproveJobAsync(string jobId, string? reviewedBy = null, string? comments = null)
+    {
+        var request = new { reviewedBy, comments };
+        var response = await _httpClient.PostAsJsonAsync($"api/jobs/{jobId}/approve", request);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ApproveRejectResponse>();
+    }
+
+    public async Task<ApproveRejectResponse?> RejectJobAsync(string jobId, string? reviewedBy = null, string? reason = null, string? comments = null)
+    {
+        var request = new { reviewedBy, reason, comments };
+        var response = await _httpClient.PostAsJsonAsync($"api/jobs/{jobId}/reject", request);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ApproveRejectResponse>();
     }
 
     public async Task<UploadResponse?> UploadVideoAsync(Stream fileStream, string fileName, IProgress<int>? progress = null)

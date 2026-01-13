@@ -482,6 +482,211 @@ public class TranslationFunctions
         }
     }
 
+    /// <summary>
+    /// GET /api/jobs/pending - Get all jobs pending human approval.
+    /// </summary>
+    [Function("GetPendingApprovals")]
+    public async Task<HttpResponseData> GetPendingApprovalsAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "jobs/pending")] HttpRequestData req,
+        [DurableClient] DurableTaskClient durableClient)
+    {
+        _logger.LogInformation("GetPendingApprovals: Fetching jobs pending approval");
+
+        try
+        {
+            var pendingJobs = new List<object>();
+            var query = new OrchestrationQuery
+            {
+                Statuses = new[] { OrchestrationRuntimeStatus.Running }
+            };
+
+            await foreach (var instance in durableClient.GetAllInstancesAsync(query))
+            {
+                // Get the full job state
+                var metadata = await durableClient.GetInstanceAsync(instance.InstanceId, getInputsAndOutputs: true);
+                if (metadata?.SerializedCustomStatus != null)
+                {
+                    try
+                    {
+                        var job = JsonSerializer.Deserialize<TranslationJob>(metadata.SerializedCustomStatus, _jsonOptions);
+                        if (job?.Status == JobStatus.PendingApproval)
+                        {
+                            pendingJobs.Add(new
+                            {
+                                jobId = job.JobId,
+                                displayName = job.DisplayName,
+                                sourceLocale = job.Request.SourceLocale,
+                                targetLocale = job.Request.TargetLocale,
+                                status = job.Status.ToString(),
+                                validationResult = job.ValidationResult,
+                                approvalRequestedAt = job.ApprovalRequestedAt,
+                                createdAt = job.CreatedAt
+                            });
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Skip if can't deserialize
+                    }
+                }
+            }
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new { jobs = pendingJobs }, _jsonOptions));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetPendingApprovals: Error fetching pending jobs");
+            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// POST /api/jobs/{jobId}/approve - Approve a translation job.
+    /// </summary>
+    [Function("ApproveJob")]
+    public async Task<HttpResponseData> ApproveJobAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "jobs/{jobId}/approve")] HttpRequestData req,
+        [DurableClient] DurableTaskClient durableClient,
+        string jobId)
+    {
+        _logger.LogInformation("ApproveJob: Approving job {JobId}", jobId);
+
+        try
+        {
+            // Parse optional request body for reviewer info
+            var body = await req.ReadAsStringAsync();
+            var approvalRequest = new ApprovalRequest();
+            if (!string.IsNullOrEmpty(body))
+            {
+                try
+                {
+                    approvalRequest = JsonSerializer.Deserialize<ApprovalRequest>(body, _jsonOptions) ?? new ApprovalRequest();
+                }
+                catch (JsonException)
+                {
+                    // Use defaults if body is invalid
+                }
+            }
+
+            // Check if orchestration exists and is running
+            var instance = await durableClient.GetInstanceAsync(jobId);
+            if (instance == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.NotFound, $"Job {jobId} not found");
+            }
+
+            if (instance.RuntimeStatus != OrchestrationRuntimeStatus.Running)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Job {jobId} is not awaiting approval (status: {instance.RuntimeStatus})");
+            }
+
+            // Raise the approval event
+            var decision = new ApprovalDecision
+            {
+                Approved = true,
+                ReviewedBy = approvalRequest.ReviewedBy ?? "Anonymous",
+                Comments = approvalRequest.Comments
+            };
+
+            await durableClient.RaiseEventAsync(jobId, "ApprovalDecision", decision);
+
+            _logger.LogInformation("ApproveJob: Approval event raised for job {JobId} by {Reviewer}", 
+                jobId, decision.ReviewedBy);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new 
+            { 
+                message = "Job approved successfully",
+                jobId,
+                reviewedBy = decision.ReviewedBy
+            }, _jsonOptions));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ApproveJob: Error approving job {JobId}", jobId);
+            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// POST /api/jobs/{jobId}/reject - Reject a translation job.
+    /// </summary>
+    [Function("RejectJob")]
+    public async Task<HttpResponseData> RejectJobAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "jobs/{jobId}/reject")] HttpRequestData req,
+        [DurableClient] DurableTaskClient durableClient,
+        string jobId)
+    {
+        _logger.LogInformation("RejectJob: Rejecting job {JobId}", jobId);
+
+        try
+        {
+            // Parse request body for rejection reason
+            var body = await req.ReadAsStringAsync();
+            var rejectionRequest = new RejectionRequest();
+            if (!string.IsNullOrEmpty(body))
+            {
+                try
+                {
+                    rejectionRequest = JsonSerializer.Deserialize<RejectionRequest>(body, _jsonOptions) ?? new RejectionRequest();
+                }
+                catch (JsonException)
+                {
+                    // Use defaults if body is invalid
+                }
+            }
+
+            // Check if orchestration exists and is running
+            var instance = await durableClient.GetInstanceAsync(jobId);
+            if (instance == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.NotFound, $"Job {jobId} not found");
+            }
+
+            if (instance.RuntimeStatus != OrchestrationRuntimeStatus.Running)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Job {jobId} is not awaiting approval (status: {instance.RuntimeStatus})");
+            }
+
+            // Raise the rejection event
+            var decision = new ApprovalDecision
+            {
+                Approved = false,
+                ReviewedBy = rejectionRequest.ReviewedBy ?? "Anonymous",
+                Reason = rejectionRequest.Reason ?? "No reason provided",
+                Comments = rejectionRequest.Comments
+            };
+
+            await durableClient.RaiseEventAsync(jobId, "ApprovalDecision", decision);
+
+            _logger.LogInformation("RejectJob: Rejection event raised for job {JobId} by {Reviewer}: {Reason}", 
+                jobId, decision.ReviewedBy, decision.Reason);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new 
+            { 
+                message = "Job rejected",
+                jobId,
+                reviewedBy = decision.ReviewedBy,
+                reason = decision.Reason
+            }, _jsonOptions));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RejectJob: Error rejecting job {JobId}", jobId);
+            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
     private static JobStatus MapOrchestrationStatus(OrchestrationRuntimeStatus status)
     {
         return status switch
@@ -511,4 +716,23 @@ public class TranslationFunctions
         await response.WriteStringAsync(JsonSerializer.Serialize(new { error = message }));
         return response;
     }
+}
+
+/// <summary>
+/// Request model for approving a job.
+/// </summary>
+public class ApprovalRequest
+{
+    public string? ReviewedBy { get; set; }
+    public string? Comments { get; set; }
+}
+
+/// <summary>
+/// Request model for rejecting a job.
+/// </summary>
+public class RejectionRequest
+{
+    public string? ReviewedBy { get; set; }
+    public string? Reason { get; set; }
+    public string? Comments { get; set; }
 }

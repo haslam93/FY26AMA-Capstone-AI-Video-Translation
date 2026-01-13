@@ -171,3 +171,48 @@ public class SupportedLocale
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Response from pending approvals endpoint.
+/// </summary>
+public class PendingApprovalsResponse
+{
+    public List<PendingApprovalJob> Jobs { get; set; } = new();
+}
+
+/// <summary>
+/// Job pending human approval.
+/// </summary>
+public class PendingApprovalJob
+{
+    public string JobId { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string SourceLocale { get; set; } = string.Empty;
+    public string TargetLocale { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public SubtitleValidationResult? ValidationResult { get; set; }
+    public DateTime? ApprovalRequestedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Response from approve/reject endpoints.
+/// </summary>
+public class ApproveRejectResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public string JobId { get; set; } = string.Empty;
+    public string? ReviewedBy { get; set; }
+    public string? Reason { get; set; }
+}
+
+/// <summary>
+/// Human approval decision.
+/// </summary>
+public class ApprovalDecision
+{
+    public bool Approved { get; set; }
+    public string? ReviewedBy { get; set; }
+    public string? Reason { get; set; }
+    public string? Comments { get; set; }
+}

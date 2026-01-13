@@ -15,13 +15,16 @@ namespace VideoTranslation.Api.Orchestration;
 /// 3. Create iteration to start translation
 /// 4. Poll for iteration completion (30-second intervals, 60-minute timeout)
 /// 5. Copy outputs to blob storage
-/// 6. Complete
+/// 6. Run AI subtitle validation
+/// 7. Wait for human approval (3-day timeout)
+/// 8. Complete (Approved) or Reject
 /// </summary>
 public static class VideoTranslationOrchestrator
 {
     // Polling configuration
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MaxDuration = TimeSpan.FromMinutes(60);
+    private static readonly TimeSpan ApprovalTimeout = TimeSpan.FromDays(3);
     private static readonly int MaxRetries = 3;
     private static readonly TimeSpan InitialRetryDelay = TimeSpan.FromSeconds(5);
 
@@ -278,12 +281,95 @@ public static class VideoTranslationOrchestrator
                 job.Result.StoredOutputs = copyResult.StoredOutputs;
             }
 
-            // Complete!
-            job.Status = JobStatus.Completed;
-            job.StatusMessage = "Translation completed successfully";
+            // Step 6: Run AI subtitle validation
+            job.Status = JobStatus.RunningValidation;
+            job.StatusMessage = "Running AI subtitle validation...";
             job.LastUpdatedAt = context.CurrentUtcDateTime;
 
-            logger.LogInformation("Job {JobId}: Completed successfully", job.JobId);
+            logger.LogInformation("Job {JobId}: Running AI validation", job.JobId);
+
+            // Get subtitle URLs (prefer stored, fallback to original)
+            var sourceSubtitleUrl = job.Result.StoredOutputs?.SourceSubtitleUrl ?? job.Result.SourceSubtitleUrl;
+            var targetSubtitleUrl = job.Result.StoredOutputs?.TargetSubtitleUrl ?? job.Result.TargetSubtitleUrl;
+
+            var subtitleValidation = await context.CallActivityAsync<RunValidationResult>(
+                nameof(RunValidationActivity),
+                new RunValidationInput
+                {
+                    JobId = job.JobId,
+                    SourceSubtitleUrl = sourceSubtitleUrl,
+                    TargetSubtitleUrl = targetSubtitleUrl,
+                    SourceLanguage = job.Request.SourceLocale,
+                    TargetLanguage = job.Request.TargetLocale
+                },
+                CreateRetryOptions());
+
+            if (subtitleValidation.Success && subtitleValidation.ValidationResult != null)
+            {
+                job.ValidationResult = subtitleValidation.ValidationResult;
+                logger.LogInformation(
+                    "Job {JobId}: Validation complete. Score={Score}, Valid={IsValid}",
+                    job.JobId,
+                    subtitleValidation.ValidationResult.ConfidenceScore,
+                    subtitleValidation.ValidationResult.IsValid);
+            }
+            else
+            {
+                logger.LogWarning("Job {JobId}: Validation failed: {Error}", job.JobId, subtitleValidation.Error);
+                // Continue without validation result - don't block the workflow
+            }
+
+            // Step 7: Wait for human approval
+            job.Status = JobStatus.PendingApproval;
+            job.StatusMessage = "Awaiting human approval...";
+            job.ApprovalRequestedAt = context.CurrentUtcDateTime;
+            job.LastUpdatedAt = context.CurrentUtcDateTime;
+
+            logger.LogInformation("Job {JobId}: Waiting for human approval (timeout: {Timeout})", job.JobId, ApprovalTimeout);
+
+            // Wait for external event with timeout
+            var approvalTask = context.WaitForExternalEvent<ApprovalDecision>("ApprovalDecision");
+            var timeoutTask = context.CreateTimer(context.CurrentUtcDateTime.Add(ApprovalTimeout), CancellationToken.None);
+
+            var winner = await Task.WhenAny(approvalTask, timeoutTask);
+
+            if (winner == timeoutTask)
+            {
+                // Auto-reject after timeout
+                logger.LogWarning("Job {JobId}: Approval timed out after {Days} days", job.JobId, ApprovalTimeout.TotalDays);
+                job.ApprovalDecision = new ApprovalDecision
+                {
+                    Approved = false,
+                    Reason = $"Auto-rejected: No response within {ApprovalTimeout.TotalDays} days",
+                    ReviewedBy = "System"
+                };
+                job.Status = JobStatus.Rejected;
+                job.StatusMessage = "Auto-rejected due to approval timeout";
+            }
+            else
+            {
+                // Human decision received
+                var decision = await approvalTask;
+                job.ApprovalDecision = decision;
+                job.ApprovalDecisionAt = context.CurrentUtcDateTime;
+
+                if (decision.Approved)
+                {
+                    job.Status = JobStatus.Approved;
+                    job.StatusMessage = $"Approved by {decision.ReviewedBy ?? "reviewer"}";
+                    logger.LogInformation("Job {JobId}: Approved by {Reviewer}", job.JobId, decision.ReviewedBy);
+                }
+                else
+                {
+                    job.Status = JobStatus.Rejected;
+                    job.StatusMessage = $"Rejected by {decision.ReviewedBy ?? "reviewer"}: {decision.Reason ?? "No reason provided"}";
+                    logger.LogInformation("Job {JobId}: Rejected by {Reviewer}: {Reason}", 
+                        job.JobId, decision.ReviewedBy, decision.Reason);
+                }
+            }
+
+            job.LastUpdatedAt = context.CurrentUtcDateTime;
+            logger.LogInformation("Job {JobId}: Final status: {Status}", job.JobId, job.Status);
             return job;
         }
         catch (Exception ex)
