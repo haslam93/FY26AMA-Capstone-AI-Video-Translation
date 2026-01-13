@@ -21,17 +21,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Azure CLI
-        uses: azure/cli@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            az version
+      - name: Install Bicep CLI
+        run: |
+          # Download and install Bicep CLI directly (no Azure CLI needed for syntax check)
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
 
       - name: Validate Bicep syntax
         run: |
           echo "🔍 Validating Bicep files..."
-          az bicep build --file infra/main.bicep --stdout > /dev/null
+          bicep build infra/main.bicep --stdout > /dev/null
           echo "✅ Bicep validation successful"
 
       - name: Validate Bicep modules
@@ -39,7 +40,7 @@ jobs:
           echo "🔍 Validating Bicep modules..."
           for file in infra/modules/*.bicep; do
             echo "  Validating: $file"
-            az bicep build --file "$file" --stdout > /dev/null
+            bicep build "$file" --stdout > /dev/null
           done
           echo "✅ All Bicep modules valid"
 
