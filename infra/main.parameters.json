@@ -15,11 +15,6 @@
         "owner": "Hammad Aslam",
         "costCenter": "Training-FY26"
       }
-    },
-    "allowedIpAddresses": {
-      "value": [
-        "99.232.72.14/32"
-      ]
     }
   }
 }

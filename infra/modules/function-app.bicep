@@ -52,30 +52,6 @@ param corsAllowedOrigins array = [
   'https://portal.azure.com'
 ]
 
-@description('IP addresses allowed to access the Function App (CIDR format, e.g., "99.232.72.14/32")')
-param allowedIpAddresses array = []
-
-// Build IP security restrictions array
-var ipAllowRules = [for (ip, index) in allowedIpAddresses: {
-  ipAddress: ip
-  action: 'Allow'
-  priority: 100 + index
-  name: 'AllowIP-${index}'
-  description: 'Allow access from whitelisted IP'
-}]
-
-var ipDenyRule = empty(allowedIpAddresses) ? [] : [
-  {
-    ipAddress: 'Any'
-    action: 'Deny'
-    priority: 2147483647
-    name: 'DenyAll'
-    description: 'Deny all other access'
-  }
-]
-
-var ipSecurityRestrictions = concat(ipAllowRules, ipDenyRule)
-
 // ============================================================================
 // APP SERVICE PLAN
 // ============================================================================
@@ -114,8 +90,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       http20Enabled: true
       netFrameworkVersion: dotnetVersion
       use32BitWorkerProcess: false
-      ipSecurityRestrictions: ipSecurityRestrictions
-      ipSecurityRestrictionsDefaultAction: empty(allowedIpAddresses) ? 'Allow' : 'Deny'
       cors: {
         allowedOrigins: corsAllowedOrigins
         supportCredentials: false

@@ -8,7 +8,6 @@ A cloud-native video translation service built on Azure that automatically trans
 - **Subtitle generation** in both source and target languages (WebVTT format)
 - **Burned-in subtitles** option to embed translated subtitles directly in the video
 - **Real-time job tracking** with status updates and progress monitoring
-- **Secure access** with IP whitelisting for both frontend and backend
 
 ## Architecture
 
@@ -17,7 +16,7 @@ A cloud-native video translation service built on Azure that automatically trans
 │                     Video Translation Service                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   User (Whitelisted IP) ──► Static Web App (Blazor WASM)                │
+│   User ──────────────────► Static Web App (Blazor WASM)                │
 │                                    │                                    │
 │                                    ▼                                    │
 │                            Function App (Durable Functions)             │
@@ -41,7 +40,6 @@ A cloud-native video translation service built on Azure that automatically trans
 | **Subtitle Generation** | Automatic WebVTT subtitle creation |
 | **Burned-in Subtitles** | Option to embed subtitles in output video |
 | **Job Dashboard** | Track all translation jobs with status updates |
-| **Secure Access** | IP whitelisting on both frontend and API |
 
 ## Project Structure
 
@@ -136,19 +134,14 @@ swa deploy ./publish/wwwroot --deployment-token "<your-token>" --env production
 
 ## Security
 
-The application implements IP-based access control:
+The application uses Azure-native security features:
 
 | Resource | Protection |
-|----------|-----------|
-| **Static Web App** | IP whitelist via `staticwebapp.config.json` |
-| **Function App** | Azure IP restriction rules |
+|----------|------------|
 | **Storage Account** | Managed Identity (no public access) |
 | **Key Vault** | RBAC (no access policies) |
-
-To update allowed IPs:
-1. Edit `src/ui/wwwroot/staticwebapp.config.json` → `networking.allowedIpRanges`
-2. Edit `infra/main.parameters.json` → `allowedIpAddresses`
-3. Redeploy both infrastructure and application
+| **Function App** | HTTPS-only, TLS 1.2 minimum |
+| **Static Web App** | HTTPS-only |
 
 ## CI/CD
 

@@ -80,24 +80,17 @@ Building a video translation service with:
 
 ## 📝 Current Task
 
-**Status**: Security Hardening Complete ✅
+**Status**: Application Running ✅
 
-### Phase 10: Security Hardening ✅ Complete
+### Phase 10: Troubleshooting & Stability ✅ Complete
 
-**Goal**: Restrict access to authorized IP addresses only
+**Goal**: Ensure stable operation of Azure resources
 
 **Tasks**:
-- [x] A) Upgrade Static Web App to Standard tier (~$9/month)
-- [x] B) Add IP whitelist to Static Web App via `staticwebapp.config.json`
-- [x] C) Add IP restriction rules to Function App
-- [x] D) Update Bicep templates with `allowedIpAddresses` parameter
-- [x] E) Update documentation (README, architecture, runbook, devops)
-
-**Security Configuration**:
-| Resource | IP Whitelisted | Configuration |
-|----------|---------------|---------------|
-| Static Web App | 99.232.72.14/32 | `staticwebapp.config.json` → `networking.allowedIpRanges` |
-| Function App | 99.232.72.14/32 | Azure access restriction rules (Bicep) |
+- [x] A) Fixed Storage Account authorization (enabled public network access)
+- [x] B) Added Storage Account Contributor role to Function App managed identity
+- [x] C) Redeployed Function App to resolve 503 errors
+- [x] D) Removed IP restrictions (reverted for future review)
 
 **Azure Resources**:
 | Resource | Name | URL |

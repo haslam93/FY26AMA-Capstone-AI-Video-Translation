@@ -1,9 +1,4 @@
 {
-  "networking": {
-    "allowedIpRanges": [
-      "99.232.72.14/32"
-    ]
-  },
   "routes": [
     {
       "route": "/api/*",

@@ -759,30 +759,27 @@ graph TB
 - ✅ **HTTPS only** - Storage and Function App HTTPS-only
 - ✅ **Soft delete enabled** - Key Vault with purge protection
 - ✅ **Diagnostic logging** - All services log to Log Analytics
-- ✅ **IP Whitelisting** - Function App and Static Web App restricted to authorized IPs
-- ✅ **Network Isolation** - Only whitelisted IPs can access the application
 
 ### Network Security
 
-The application implements IP-based access restrictions to limit exposure:
+The application uses Azure-native security features:
 
 | Resource | Protection | Configuration |
 |----------|-----------|---------------|
-| **Static Web App** | IP Whitelist | `staticwebapp.config.json` → `networking.allowedIpRanges` |
-| **Function App** | IP Restriction Rules | Azure access restrictions via Bicep/Portal |
-| **Storage Account** | Managed Identity | Only Function App can access (no public access needed) |
+| **Static Web App** | HTTPS-only | Automatic SSL certificates |
+| **Function App** | HTTPS-only | TLS 1.2 minimum |
+| **Storage Account** | Managed Identity | Only Function App can access via RBAC |
 | **Speech Service** | API Key + MI | Protected by Key Vault, called only by Function App |
 
 ```mermaid
 graph TB
     subgraph "Internet"
-        User[Authorized User<br/>99.232.72.14]
-        Blocked[Blocked Users<br/>All Other IPs]
+        User[User]
     end
     
     subgraph "Azure Edge"
-        SWA[Static Web App<br/>IP Whitelist]
-        FA[Function App<br/>IP Restriction Rules]
+        SWA[Static Web App<br/>HTTPS Only]
+        FA[Function App<br/>HTTPS Only]
     end
     
     subgraph "Internal Services"
@@ -790,10 +787,8 @@ graph TB
         Speech[Speech Services]
     end
     
-    User -->|Allowed| SWA
-    User -->|Allowed| FA
-    Blocked -.->|403 Forbidden| SWA
-    Blocked -.->|403 Forbidden| FA
+    User -->|HTTPS| SWA
+    SWA -->|API Call| FA
     FA -->|Managed Identity| Storage
     FA -->|API Key| Speech
 ```

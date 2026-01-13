@@ -1,88 +1,316 @@
 # Custom Instructions for GitHub Copilot
 
 ## Project Overview
-This is a video translation service built on Azure Durable Functions. The system accepts video files, translates speech using Azure Speech API, generates/cleans subtitles, and returns translated video content.
+
+This is a **Video Translation Service** built as a capstone project for Azure. The system translates video content from one language to another using Azure Speech Video Translation API, featuring:
+
+- **Automatic video dubbing** with voice cloning (Personal Voice) or platform voices
+- **Subtitle generation** in both source and target languages (WebVTT format)
+- **Burned-in subtitles** option to embed translated subtitles directly in the video
+- **Real-time job tracking** with status updates via a web dashboard
+- **Durable Functions orchestration** for reliable long-running operations
 
 ## Technology Stack
-- **Runtime**: Azure Functions (Durable Functions)
-- **Language**: C# / .NET
-- **Infrastructure**: Azure Bicep
-- **CI/CD**: GitHub Actions
+
+| Component | Technology |
+|-----------|------------|
+| **Backend API** | Azure Durable Functions (.NET 8 Isolated Worker) |
+| **Frontend UI** | Blazor WebAssembly (.NET 9) |
+| **Translation API** | Azure Speech Video Translation API (version 2025-05-20) |
+| **Storage** | Azure Blob Storage with Managed Identity |
+| **Monitoring** | Application Insights + Log Analytics |
+| **Infrastructure** | Azure Bicep (subscription-scoped) |
+| **CI/CD** | GitHub Actions |
+| **Hosting** | Azure Static Web App (UI) + Azure Function App (API) |
+
+## Azure Resources (Deployment 3)
+
+| Resource | Name | URL |
+|----------|------|-----|
+| Resource Group | AMAFY26-deployment-3 | - |
+| Function App | FuncApp-AMA-3 | https://funcapp-ama-3.azurewebsites.net |
+| Static Web App | SWA-AMA-3 | https://ashy-glacier-0400c0b0f.1.azurestaticapps.net |
+| Speech Service | Speech-AMA-3 | https://speech-ama-3.cognitiveservices.azure.com |
+| Storage Account | storageama3 | - |
+| Application Insights | AppInsights-AMA-3 | - |
+| Key Vault | KeyVault-AMA-3 | - |
 
 ---
 
 ## Directory Structure
 
-### `/src/Api`
-HTTP-triggered Azure Functions that serve as the public API layer.
-- **Submit endpoint**: Accepts video upload requests, validates input, and starts the orchestration
-- **Status endpoint**: Returns the current state of a translation job by orchestration ID
-- All API responses should follow consistent error models from `/src/Shared`
+```
+Capstone/
+├── src/
+│   ├── Api/                        # Azure Durable Functions backend
+│   │   ├── Activities/             # Durable activity functions
+│   │   │   ├── CopyOutputsActivity.cs
+│   │   │   ├── CreateIterationActivity.cs
+│   │   │   ├── CreateTranslationActivity.cs
+│   │   │   ├── GetIterationStatusActivity.cs
+│   │   │   └── ValidateInputActivity.cs
+│   │   ├── Functions/              # HTTP trigger functions
+│   │   │   └── TranslationFunctions.cs
+│   │   ├── Models/                 # Data models and DTOs
+│   │   │   ├── TranslationJob.cs
+│   │   │   ├── TranslationJobRequest.cs
+│   │   │   └── SpeechApi/          # Speech API response models
+│   │   ├── Orchestration/          # Durable orchestrator
+│   │   │   └── VideoTranslationOrchestrator.cs
+│   │   ├── Services/               # Business logic services
+│   │   │   ├── BlobStorageService.cs
+│   │   │   └── SpeechTranslationService.cs
+│   │   ├── Program.cs              # DI configuration
+│   │   └── local.settings.json     # Local dev settings
+│   │
+│   └── ui/                         # Blazor WebAssembly frontend
+│       ├── Pages/                  # Razor pages
+│       │   ├── Create.razor        # New job form
+│       │   ├── Index.razor         # Job dashboard
+│       │   └── JobDetails.razor    # Job status/results
+│       ├── Models/                 # Client-side models
+│       │   └── JobModels.cs
+│       ├── Services/               # API client services
+│       │   └── TranslationService.cs
+│       └── wwwroot/
+│           └── staticwebapp.config.json  # SWA routing config
+│
+├── infra/                          # Bicep IaC templates
+│   ├── main.bicep                  # Entry point (subscription scope)
+│   ├── main.parameters.json        # Deployment parameters
+│   ├── deploy.ps1                  # PowerShell deployment script
+│   └── modules/                    # Resource modules
+│       ├── function-app.bicep
+│       ├── static-web-app.bicep
+│       ├── storage-account.bicep
+│       ├── speech-services.bicep
+│       ├── keyvault.bicep
+│       ├── app-insights.bicep
+│       ├── log-analytics.bicep
+│       └── role-assignments.bicep
+│
+├── tests/
+│   ├── unit/                       # xUnit + bUnit tests
+│   └── integration/                # Integration tests
+│
+├── docs/
+│   ├── architecture.md             # System design
+│   ├── runbook.md                  # Operations guide
+│   ├── devops.md                   # CI/CD documentation
+│   └── test-plan.md                # Testing strategy
+│
+├── .github/
+│   ├── workflows/                  # CI/CD pipelines
+│   │   ├── ci.yml                  # Build, test, validate
+│   │   ├── cd-infra.yml            # Infrastructure deployment
+│   │   └── cd-app.yml              # Application deployment
+│   └── custom-instructions.md      # This file
+│
+├── progress.md                     # Project progress tracker
+└── README.md                       # Project overview
+```
 
-### `/src/Orchestrator`
-Durable Functions orchestrations that manage the workflow state machine.
-- Coordinates the entire translation pipeline
-- Handles retries, timeouts, and compensation logic
-- Implements the saga pattern for long-running operations
-- Should be idempotent and deterministic (Durable Functions requirement)
+---
 
-### `/src/Workers`
-Activity functions that perform the actual work. Each subfolder is a logical grouping:
+## Key API Endpoints
 
-#### `/src/Workers/SpeechVideoTranslation`
-- Wrapper client for Azure Speech Video Translation API
-- Handles authentication and API calls to Azure Speech services
-- Manages translation job submission and polling
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs` | GET | List all translation jobs |
+| `/api/jobs` | POST | Create a new translation job |
+| `/api/jobs/{jobId}` | GET | Get job status and results |
+| `/api/jobs/{jobId}/iterate` | POST | Create a new iteration (re-translate) |
+| `/api/upload` | POST | Upload video file directly |
+| `/api/health` | GET | Health check endpoint |
 
-#### `/src/Workers/Subtitles`
-- WebVTT file parsing and generation
-- Subtitle cleanup and formatting
-- Glossary/terminology handling for domain-specific translations
-- Timing adjustments and synchronization
+---
 
-#### `/src/Workers/Storage`
-- Azure Blob Storage operations
-- SAS token generation for secure client uploads/downloads
-- File management (upload, download, delete, copy)
-- Container management
+## How to Deploy to Azure
 
-### `/src/Shared`
-Cross-cutting concerns and shared code:
-- **Contracts**: Request/response DTOs and API models
-- **Telemetry**: Application Insights integration, custom metrics, and tracing
-- **Error Models**: Standardized error responses and exception types
-- **Constants**: Configuration keys, magic strings, and enums
+### Prerequisites
+- Azure CLI installed and logged in (`az login`)
+- .NET 8 SDK
+- Azure Functions Core Tools v4
+- Node.js 18+ (for SWA CLI)
 
-### `/tests/unit`
-Unit tests for individual components:
-- Mock external dependencies
-- Test business logic in isolation
-- Follow naming convention: `{ClassName}Tests.cs`
+### Step 1: Deploy Infrastructure (Bicep)
 
-### `/tests/integration`
-Integration tests that verify component interactions:
-- Test against real or emulated Azure services
-- Verify end-to-end workflows
-- May require test configuration/secrets
+```powershell
+# Set subscription
+az account set --subscription "YOUR_SUBSCRIPTION_ID"
 
-### `/infra`
-Infrastructure as Code using Azure Bicep:
-- **main.bicep**: Root template that deploys all resources
-- **monitoring.bicep**: Application Insights, Log Analytics, alerts, and dashboards
-- Follow Azure naming conventions and use parameters for environment-specific values
+# Deploy infrastructure
+az deployment sub create `
+  --location eastus2 `
+  --template-file infra/main.bicep `
+  --parameters infra/main.parameters.json `
+  --parameters deploymentNumber=3
+```
 
-### `/docs`
-Project documentation:
-- **architecture.md**: System design, component diagrams, data flow
-- **adr/**: Architecture Decision Records (use template: `NNNN-title.md`)
-- **runbook.md**: Operational procedures, deployment, troubleshooting
-- **test-plan.md**: Testing strategy and test case documentation
-- **demo-script.md**: Step-by-step demo instructions
+### Step 2: Deploy Function App
 
-### `/.github/workflows`
-GitHub Actions CI/CD pipelines:
-- **ci.yml**: Build, test, and validate on PR/push
-- **cd.yml**: Deploy to Azure environments
+```powershell
+cd src/Api
+
+# Build and publish
+dotnet publish -c Release -o ./bin/publish
+
+# Create zip package
+Compress-Archive -Path ./bin/publish/* -DestinationPath ./bin/deploy.zip -Force
+
+# Deploy to Azure
+az functionapp deployment source config-zip `
+  --resource-group "AMAFY26-deployment-3" `
+  --name "FuncApp-AMA-3" `
+  --src ./bin/deploy.zip `
+  --build-remote true
+```
+
+### Step 3: Deploy Static Web App (UI)
+
+```powershell
+cd src/ui
+
+# Build and publish
+dotnet publish -c Release -o ./publish
+
+# Get deployment token
+$token = az staticwebapp secrets list `
+  --name "SWA-AMA-3" `
+  --resource-group "AMAFY26-deployment-3" `
+  --query "properties.apiKey" -o tsv
+
+# Deploy
+swa deploy ./publish/wwwroot --deployment-token $token --env production
+```
+
+### Step 4: Configure Function App Settings
+
+After initial deployment, ensure these settings are configured in the Function App:
+
+```powershell
+az functionapp config appsettings set `
+  --name "FuncApp-AMA-3" `
+  --resource-group "AMAFY26-deployment-3" `
+  --settings `
+    "SpeechServiceEndpoint=https://speech-ama-3.cognitiveservices.azure.com" `
+    "SpeechServiceRegion=eastus2" `
+    "BlobStorageEndpoint=https://storageama3.blob.core.windows.net"
+```
+
+---
+
+## What Has Been Completed
+
+### Phase 1-5: Core Application ✅
+- Durable Functions orchestration with activity functions
+- Azure Speech Video Translation API integration
+- Blazor WebAssembly UI with job dashboard
+- Azure Blob Storage for video/output management
+- Managed Identity authentication
+
+### Phase 6-7: DevOps & Testing ✅
+- GitHub Actions CI/CD pipelines (ci.yml, cd-infra.yml, cd-app.yml)
+- Bicep IaC templates for all Azure resources
+- Unit tests with xUnit and bUnit
+- Integration tests
+
+### Phase 8: Subtitle Enhancements ✅
+- WebVTT subtitle download links (source and target languages)
+- "Burn subtitles into video" checkbox option
+- "Max Characters Per Subtitle Line" configuration
+- Fixed 409 Conflict errors with unique operation IDs
+
+### Phase 9: Language Support ✅
+- Expanded to 120+ source languages and 60+ target languages
+- Fixed locale validation for all Azure Speech supported languages
+
+### Phase 10: Troubleshooting & Stability ✅
+- Fixed Storage Account authorization (enabled public network access)
+- Added Storage Account Contributor role to Function App
+- Removed IP restrictions (reverted for stability)
+
+---
+
+## Common Issues & Fixes
+
+### Function App 503 Error
+**Cause**: Storage Account has `publicNetworkAccess: Disabled` or missing role assignments
+**Fix**:
+```powershell
+az storage account update --name "storageama3" --resource-group "AMAFY26-deployment-3" --public-network-access Enabled
+
+# Add role if needed
+az role assignment create --assignee "<function-app-principal-id>" --role "Storage Account Contributor" --scope "<storage-account-resource-id>"
+
+az functionapp restart --name "FuncApp-AMA-3" --resource-group "AMAFY26-deployment-3"
+```
+
+### SWA 403 Forbidden
+**Cause**: IP restrictions in `staticwebapp.config.json` blocking access
+**Fix**: Remove `networking.allowedIpRanges` from config and redeploy
+
+### 409 Conflict Error
+**Cause**: Duplicate operation IDs in Speech API calls
+**Fix**: Ensure unique operation IDs by using truncated GUIDs with random suffixes
+
+### CORS Errors
+**Cause**: Function App CORS not configured for SWA domain
+**Fix**: Add SWA hostname to `corsAllowedOrigins` in Bicep or Azure Portal
+
+---
+
+## Local Development
+
+### Start Azurite (Local Storage Emulator)
+```powershell
+azurite --silent --location "$env:TEMP\azurite" --blobPort 10000 --queuePort 10001 --tablePort 10002
+```
+
+### Start Function App Locally
+```powershell
+cd src/Api
+func start
+```
+
+### Start UI Locally
+```powershell
+cd src/ui
+dotnet run
+```
+
+### Required local.settings.json for API
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "SpeechServiceEndpoint": "https://speech-ama-3.cognitiveservices.azure.com",
+    "SpeechServiceRegion": "eastus2",
+    "SpeechServiceKey": "<your-key>",
+    "BlobStorageConnectionString": "<your-connection-string>"
+  }
+}
+```
+
+---
+
+## Speech Video Translation API Notes
+
+- **API Version**: 2025-05-20
+- **Endpoint Pattern**: `{endpoint}/videotranslation/translations/{translationId}`
+- **Max Video Length**: 4 hours
+- **Supported Formats**: MP4, WebM, MOV, AVI
+- **Voice Options**: 
+  - `PlatformVoice` - Azure neural voice
+  - `PersonalVoice` - Clone speaker's voice (requires consent)
+
+### Translation Flow
+1. **Create Translation** → Returns translation ID
+2. **Create Iteration** → Starts the actual processing
+3. **Poll Status** → Check until `Succeeded` or `Failed`
+4. **Get Results** → Download translated video and subtitles
 
 ---
 
@@ -101,7 +329,7 @@ GitHub Actions CI/CD pipelines:
 - Use activity functions for all external calls
 
 ### Error Handling
-- Use the error models from `/src/Shared`
+- Use the error models from shared code
 - Include correlation IDs in all error responses
 - Log errors with full context before returning
 
@@ -109,3 +337,29 @@ GitHub Actions CI/CD pipelines:
 - Track custom events for business metrics
 - Use dependency tracking for external calls
 - Include operation context for distributed tracing
+
+---
+
+## Quick Reference Commands
+
+```powershell
+# Check Function App logs
+az webapp log tail --name "FuncApp-AMA-3" --resource-group "AMAFY26-deployment-3"
+
+# Test health endpoint
+Invoke-WebRequest -Uri "https://funcapp-ama-3.azurewebsites.net/api/health" -Method GET
+
+# List functions
+az functionapp function list --name "FuncApp-AMA-3" --resource-group "AMAFY26-deployment-3" -o table
+
+# Restart Function App
+az functionapp restart --name "FuncApp-AMA-3" --resource-group "AMAFY26-deployment-3"
+
+# Validate Bicep
+az bicep build --file infra/main.bicep
+```
+
+---
+
+## GitHub Repository
+https://github.com/haslam93/FY26AMA-Capstone-AI-Video-Translation
