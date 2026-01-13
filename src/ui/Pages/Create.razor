@@ -149,6 +149,24 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mt-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="jobRequest.ExportSubtitleInVideo" id="exportSubtitle" />
+                                <label class="form-check-label" for="exportSubtitle">
+                                    <i class="bi bi-badge-cc"></i> Burn subtitles into video
+                                </label>
+                                <div class="form-text">Embed translated subtitles directly into the output video</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Max Characters Per Subtitle Line (optional)</label>
+                            <InputNumber class="form-control" @bind-Value="jobRequest.SubtitleMaxCharCountPerSegment" 
+                                         min="20" max="100" placeholder="50" />
+                            <div class="form-text">Maximum characters per subtitle segment (default: 50)</div>
+                        </div>
+                    </div>
+
                     @if (submitError != null)
                     {
                         <div class="alert alert-danger" role="alert">

@@ -48,7 +48,9 @@ public class CreateTranslationActivity
                 }
             };
 
-            var operationId = $"create-translation-{input.TranslationId}";
+            // Operation ID must be globally unique - include translation ID and a unique suffix
+            var fullOperationId = $"trans-{input.TranslationId}-{Guid.NewGuid():N}";
+            var operationId = fullOperationId.Length > 64 ? fullOperationId.Substring(0, 64) : fullOperationId;
             var response = await _speechService.CreateTranslationAsync(
                 input.TranslationId,
                 operationId,

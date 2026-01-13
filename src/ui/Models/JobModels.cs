@@ -12,6 +12,8 @@ public class CreateJobRequest
     public string TargetLocale { get; set; } = "es-ES";
     public string VoiceKind { get; set; } = "PlatformVoice";  // PersonalVoice requires special approval
     public int? SpeakerCount { get; set; }
+    public bool ExportSubtitleInVideo { get; set; } = false;
+    public int? SubtitleMaxCharCountPerSegment { get; set; } = 50;
 }
 
 /// <summary>
@@ -60,8 +62,9 @@ public class JobStatusResponse
 public class JobResultDto
 {
     public string? TranslatedVideoUrl { get; set; }
-    public string? SourceWebVttUrl { get; set; }
-    public string? TargetWebVttUrl { get; set; }
+    public string? SourceSubtitleUrl { get; set; }
+    public string? TargetSubtitleUrl { get; set; }
+    public string? MetadataUrl { get; set; }
 }
 
 /// <summary>

@@ -80,7 +80,34 @@ Building a video translation service with:
 
 ## 📝 Current Task
 
-**Status**: Application Deployed & Working ✅
+**Status**: Adding Subtitle Features 🔄
+
+### Phase 9: Subtitle Enhancements (In Progress)
+
+**Goal**: Add subtitle support - both as downloadable WebVTT files and burned into video
+
+**Tasks**:
+- [x] A) Check logs to verify what subtitle URLs were returned from completed job ✅
+  - **Finding**: Subtitles ARE being stored! Found in blob storage:
+    - `subtitles/7a1b14e65615/iteration-1/source-subtitles.vtt` (408 bytes)
+    - `subtitles/7a1b14e65615/iteration-1/target-subtitles.vtt` (568 bytes)
+    - `subtitles/7a1b14e65615/iteration-1/metadata.json` (2162 bytes)
+  - Issue is the **UI not displaying them**, not the API
+- [x] B) Update UI to display subtitle download links (source & target WebVTT) ✅
+  - Fixed property name mismatch: `SourceWebVttUrl` → `SourceSubtitleUrl`, `TargetWebVttUrl` → `TargetSubtitleUrl`
+  - Updated JobDetails.razor to use correct property names
+- [x] C) Enable `exportSubtitleInVideo` option to burn subtitles into video ✅
+  - API already has `ExportSubtitleInVideo` in `TranslationJobRequest`
+  - Orchestrator already passes it to `CreateIterationActivity`
+  - Activity already passes it to Speech API
+- [x] D) Add checkbox in Create page for "Burn subtitles into video" ✅
+  - Added checkbox to Create.razor with label and helper text
+  - Added "Max Characters Per Subtitle Line" input field
+- [x] E) Deploy and test ✅
+  - API deployed to FuncApp-AMA-3
+  - UI deployed to https://ashy-glacier-0400c0b0f.1.azurestaticapps.net
+
+### Phase 9: Subtitle Enhancements ✅ Complete
 
 **Azure Resources**:
 | Resource | Name | URL |
@@ -90,14 +117,22 @@ Building a video translation service with:
 | Speech Service | Speech-AMA-3 | https://speech-ama-3.cognitiveservices.azure.com |
 | Storage Account | storageama3 | - |
 
-**Next Steps**:
-- [ ] Create GitHub Actions CI/CD pipelines
-- [ ] Add iteration feature (edit subtitles and re-translate)
-- [ ] Add video preview in UI
-- [ ] Add download buttons for translated outputs
-7. ⬜ End-to-end test
+### Completed Phases
 
-**Next Action**: Test the full application end-to-end
+#### Phase 8: DevOps Setup ✅ Complete
+- [x] Created CI workflow (ci.yml) - validates Bicep, builds & tests API and UI
+- [x] Created CD Infrastructure workflow (cd-infra.yml) - deploys Bicep templates
+- [x] Created CD Application workflow (cd-app.yml) - deploys API & UI
+- [x] Added unit tests for API (15 tests) and UI (11 tests)
+- [x] Created devops.md documentation
+- [x] Pushed to GitHub: https://github.com/haslam93/FY26AMA-Capstone-AI-Video-Translation
+- [x] Fixed CI Bicep validation (use Bicep CLI directly instead of Azure CLI)
+
+#### Previous Phases ✅
+- Phase 1-7: Core application built and deployed
+- First successful video translation completed! 🎉
+
+**Next Action**: Check Application Insights logs for subtitle URLs
 
 ---
 

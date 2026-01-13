@@ -68,7 +68,9 @@ public class CreateIterationActivity
                 Input = iterationInput
             };
 
-            var operationId = $"create-iteration-{input.IterationId}";
+            // Operation ID must be globally unique - include translation ID and a unique suffix
+            var fullOperationId = $"iter-{input.TranslationId}-{input.IterationId}-{Guid.NewGuid():N}";
+            var operationId = fullOperationId.Length > 64 ? fullOperationId.Substring(0, 64) : fullOperationId;
             var response = await _speechService.CreateIterationAsync(
                 input.TranslationId,
                 input.IterationId,
