@@ -140,6 +140,175 @@
                             </div>
                         </div>
                     </div>
+
+                    @* AI Quality Validation Section *@
+                    <div class="card mb-4 @(validationResult != null ? (validationResult.IsValid ? "border-success" : "border-warning") : "")">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-robot"></i> AI Quality Validation
+                            </h5>
+                            @if (validationResult != null)
+                            {
+                                <span class="badge @(validationResult.IsValid ? "bg-success" : "bg-warning") fs-6">
+                                    @(validationResult.ConfidenceScore.ToString("P0"))
+                                </span>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (validating)
+                            {
+                                <div class="text-center py-3">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Analyzing...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0 text-muted">AI agent is analyzing subtitles...</p>
+                                </div>
+                            }
+                            else if (validationError != null)
+                            {
+                                <div class="alert alert-danger mb-0">
+                                    <i class="bi bi-exclamation-triangle"></i> @validationError
+                                </div>
+                            }
+                            else if (validationResult != null)
+                            {
+                                @* Overall Score *@
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Overall Quality Score</span>
+                                        <strong class="@(validationResult.ConfidenceScore >= 0.8 ? "text-success" : validationResult.ConfidenceScore >= 0.6 ? "text-warning" : "text-danger")">
+                                            @(validationResult.ConfidenceScore.ToString("P0"))
+                                        </strong>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar @(validationResult.ConfidenceScore >= 0.8 ? "bg-success" : validationResult.ConfidenceScore >= 0.6 ? "bg-warning" : "bg-danger")"
+                                             role="progressbar" 
+                                             style="width: @(validationResult.ConfidenceScore * 100)%"
+                                             aria-valuenow="@(validationResult.ConfidenceScore * 100)" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @* Category Scores *@
+                                @if (validationResult.CategoryScores != null)
+                                {
+                                    <h6 class="mb-3">Category Scores</h6>
+                                    <div class="row row-cols-2 g-2 mb-3">
+                                        <div class="col">
+                                            <div class="card bg-light">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="small text-muted">Translation</div>
+                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.TranslationAccuracyScore)">
+                                                        @(validationResult.CategoryScores.TranslationAccuracyScore.ToString("P0"))
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="card bg-light">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="small text-muted">Grammar</div>
+                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.GrammarScore)">
+                                                        @(validationResult.CategoryScores.GrammarScore.ToString("P0"))
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="card bg-light">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="small text-muted">Timing</div>
+                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.TimingScore)">
+                                                        @(validationResult.CategoryScores.TimingScore.ToString("P0"))
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="card bg-light">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="small text-muted">Cultural</div>
+                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.CulturalContextScore)">
+                                                        @(validationResult.CategoryScores.CulturalContextScore.ToString("P0"))
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                @* Stats *@
+                                <div class="small text-muted mb-3">
+                                    <i class="bi bi-file-text"></i> @validationResult.SourceCueCount source cues → @validationResult.TargetCueCount target cues
+                                    <br/>
+                                    <i class="bi bi-chat-text"></i> @validationResult.SourceWordCount source words → @validationResult.TargetWordCount target words
+                                </div>
+
+                                @* AI Reasoning *@
+                                @if (!string.IsNullOrWhiteSpace(validationResult.Reasoning))
+                                {
+                                    <div class="alert alert-info mb-3">
+                                        <strong><i class="bi bi-lightbulb"></i> AI Analysis:</strong>
+                                        <p class="mb-0 mt-1 small">@validationResult.Reasoning</p>
+                                    </div>
+                                }
+
+                                @* Issues *@
+                                @if (validationResult.Issues.Any())
+                                {
+                                    <h6 class="mb-2">Issues Found (@validationResult.Issues.Count)</h6>
+                                    <div class="accordion" id="issuesAccordion">
+                                        @for (int i = 0; i < Math.Min(validationResult.Issues.Count, 5); i++)
+                                        {
+                                            var issue = validationResult.Issues[i];
+                                            var collapseId = $"issue-{i}";
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header">
+                                                    <button class="accordion-button collapsed py-2" type="button" 
+                                                            data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                                                        <span class="badge @GetSeverityBadgeClass(issue.Severity) me-2">@issue.SeverityText</span>
+                                                        <span class="small">@issue.CategoryText</span>
+                                                    </button>
+                                                </h2>
+                                                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#issuesAccordion">
+                                                    <div class="accordion-body small">
+                                                        <p class="mb-1">@issue.Description</p>
+                                                        @if (!string.IsNullOrEmpty(issue.Timestamp))
+                                                        {
+                                                            <p class="mb-1 text-muted"><i class="bi bi-clock"></i> @issue.Timestamp</p>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(issue.SuggestedFix))
+                                                        {
+                                                            <p class="mb-0 text-success"><i class="bi bi-lightbulb"></i> @issue.SuggestedFix</p>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (validationResult.Issues.Count > 5)
+                                    {
+                                        <p class="text-muted small mt-2">And @(validationResult.Issues.Count - 5) more issues...</p>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="text-success">
+                                        <i class="bi bi-check-circle"></i> No issues found!
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-3">Use AI to analyze translation quality</p>
+                                <button class="btn btn-primary w-100" @onclick="ValidateSubtitles">
+                                    <i class="bi bi-robot"></i> Analyze Translation Quality
+                                </button>
+                            }
+                        </div>
+                    </div>
                 }
             </div>
 
@@ -193,6 +362,11 @@
     private bool autoRefresh = false;
     private Timer? refreshTimer;
 
+    // Validation state
+    private SubtitleValidationResult? validationResult;
+    private bool validating = false;
+    private string? validationError;
+
     private bool IsProcessing => job?.Status != null && 
         !job.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) &&
         !job.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase);
@@ -235,6 +409,34 @@
         }
     }
 
+    private async Task ValidateSubtitles()
+    {
+        validating = true;
+        validationError = null;
+        validationResult = null;
+
+        try
+        {
+            var response = await ApiService.ValidateSubtitlesAsync(JobId);
+            if (response != null)
+            {
+                validationResult = response.ValidationResult;
+            }
+            else
+            {
+                validationError = "Validation returned no result";
+            }
+        }
+        catch (Exception ex)
+        {
+            validationError = $"Validation failed: {ex.Message}";
+        }
+        finally
+        {
+            validating = false;
+        }
+    }
+
     private void StartAutoRefresh()
     {
         autoRefresh = true;
@@ -268,6 +470,28 @@
             "processing" or "validating" or "creatingtranslation" or "creatingiteration" or "copyingoutputs" => "bg-info",
             "completed" => "bg-success",
             "failed" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string GetScoreClass(double score)
+    {
+        return score switch
+        {
+            >= 0.8 => "text-success",
+            >= 0.6 => "text-warning",
+            _ => "text-danger"
+        };
+    }
+
+    private static string GetSeverityBadgeClass(int severity)
+    {
+        return severity switch
+        {
+            3 => "bg-danger",        // Critical
+            2 => "bg-warning text-dark", // High
+            1 => "bg-info",          // Medium
+            0 => "bg-secondary",     // Low
             _ => "bg-secondary"
         };
     }

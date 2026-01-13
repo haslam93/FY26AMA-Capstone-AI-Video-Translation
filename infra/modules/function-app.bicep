@@ -52,6 +52,15 @@ param corsAllowedOrigins array = [
   'https://portal.azure.com'
 ]
 
+@description('AI Foundry project endpoint for multi-agent orchestration')
+param aiFoundryProjectEndpoint string = ''
+
+@description('AI Foundry OpenAI endpoint')
+param aiFoundryOpenAIEndpoint string = ''
+
+@description('AI Foundry GPT-4o-mini deployment name')
+param aiFoundryModelDeploymentName string = 'gpt-4o-mini'
+
 // ============================================================================
 // APP SERVICE PLAN
 // ============================================================================
@@ -95,9 +104,22 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         supportCredentials: false
       }
       appSettings: [
+        // Identity-based connection for AzureWebJobsStorage (no keys required)
         {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccountName
+        }
+        {
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: 'https://${storageAccountName}.blob.${environment().suffixes.storage}'
+        }
+        {
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: 'https://${storageAccountName}.queue.${environment().suffixes.storage}'
+        }
+        {
+          name: 'AzureWebJobsStorage__tableServiceUri'
+          value: 'https://${storageAccountName}.table.${environment().suffixes.storage}'
         }
         // Note: WEBSITE_CONTENTAZUREFILECONNECTIONSTRING and WEBSITE_CONTENTSHARE are not needed
         // for dedicated plans (B1, S1, P1v2, etc.) - only for Consumption (Y1) and Elastic Premium (EP)
@@ -121,14 +143,22 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
         }
+        // AI Foundry settings for multi-agent architecture
+        {
+          name: 'AIFoundry__ProjectEndpoint'
+          value: aiFoundryProjectEndpoint
+        }
+        {
+          name: 'AIFoundry__OpenAIEndpoint'
+          value: aiFoundryOpenAIEndpoint
+        }
+        {
+          name: 'AIFoundry__ModelDeploymentName'
+          value: aiFoundryModelDeploymentName
+        }
       ]
     }
   }
-}
-
-// Reference to existing storage account
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageAccountName
 }
 
 // ============================================================================

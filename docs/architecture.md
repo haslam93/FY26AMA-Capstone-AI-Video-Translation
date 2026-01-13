@@ -559,6 +559,8 @@ graph TB
         subgraph "AI Services"
             SPEECH[Speech Services<br/>Speech-AMA-{N}<br/>S0 Tier]
             AI[AI Services<br/>AIServices-AMA-{N}<br/>S0 Tier]
+            PROJ[Foundry Project<br/>video-translation-agents<br/>Multi-Agent]
+            GPT[GPT-4o-mini<br/>Deployment]
         end
         
         subgraph "Security"
@@ -576,9 +578,12 @@ graph TB
     FUNC -->|Managed Identity| STORAGE
     FUNC -->|Managed Identity| SPEECH
     FUNC -->|Managed Identity| KV
+    FUNC -->|Managed Identity| PROJ
     FUNC -.->|Telemetry| APPINS
     APPINS --> LOG
     SPEECH --> AI
+    PROJ --> GPT
+    AI --> GPT
 ```
 
 ### Core Services
@@ -590,7 +595,9 @@ graph TB
 | **App Service Plan** | `ASP-AMA-{N}` | Standard S1 | Hosting plan for Functions |
 | **Storage Account** | `storageama{N}` | Standard LRS | Blob storage (videos, outputs, subtitles) |
 | **Speech Services** | `Speech-AMA-{N}` | S0 | Video Translation API |
-| **AI Services** | `AIServices-AMA-{N}` | S0 | Cognitive Services (translation, language) |
+| **AI Services** | `AIServices-AMA-{N}` | S0 | Cognitive Services (hub for AI) |
+| **Foundry Project** | `video-translation-agents` | - | Multi-agent orchestration project |
+| **GPT-4o-mini** | `gpt-4o-mini` | Standard (10K TPM) | Subtitle validation agent model |
 
 ### Supporting Services
 
@@ -746,10 +753,44 @@ graph TB
 | Function App MI | Speech Services | Cognitive Services User |
 | Function App MI | AI Services | Cognitive Services User |
 | Function App MI | AI Services | Cognitive Services Contributor |
+| Function App MI | AI Services | Cognitive Services OpenAI User |
+| Function App MI | AI Services | Cognitive Services OpenAI Contributor |
+| Foundry Project MI | AI Services | Cognitive Services OpenAI User |
+| Foundry Project MI | AI Services | Cognitive Services User |
+| Foundry Project MI | Storage Account | Storage Blob Data Contributor |
+| Foundry Project MI | Key Vault | Key Vault Secrets User |
 | User Principal | Speech Services | Cognitive Services User |
 | User Principal | AI Services | Cognitive Services User |
+| User Principal | AI Services | Cognitive Services OpenAI User |
 
 **User Principal ID**: `716e5244-7a36-4bef-9fe6-18f8b62f3cce`
+
+### Multi-Agent Architecture (Planned)
+
+The system is being enhanced with a multi-agent architecture for improved subtitle quality:
+
+```mermaid
+graph TB
+    subgraph "Multi-Agent Workflow"
+        SUP[Supervisor Agent<br/>Coordinates workflow]
+        TRANS[Translation Executor<br/>Wraps Speech API]
+        VAL[Validation Agent<br/>GPT-4o-mini]
+        HUMAN[Human-in-the-Loop<br/>Final approval]
+    end
+    
+    SUP --> TRANS
+    SUP --> VAL
+    SUP --> HUMAN
+    VAL -->|Quality Score| SUP
+    HUMAN -->|Approve/Reject| SUP
+```
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| **Supervisor** | - | Coordinates workflow, routes tasks |
+| **Translation Executor** | Speech API | Wraps existing translation logic |
+| **Validation Agent** | GPT-4o-mini | Validates subtitle quality, timing |
+| **Human-in-the-Loop** | - | Final review and approval |
 
 ### Key Security Features
 

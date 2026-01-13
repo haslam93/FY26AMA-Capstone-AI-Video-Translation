@@ -160,6 +160,10 @@ module functionApp 'modules/function-app.bicep' = {
       'https://portal.azure.com'
       'https://${staticWebApp.outputs.defaultHostname}'
     ]
+    // AI Foundry settings for multi-agent architecture
+    aiFoundryProjectEndpoint: aiFoundry.outputs.projectEndpoint
+    aiFoundryOpenAIEndpoint: 'https://${aiFoundry.outputs.accountName}.openai.azure.com'
+    aiFoundryModelDeploymentName: aiFoundry.outputs.gpt4oMiniDeploymentName
   }
 }
 
@@ -176,6 +180,7 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     keyVaultName: keyVault.outputs.name
     speechServiceName: speechServices.outputs.name
     aiServicesName: aiFoundry.outputs.accountName
+    foundryProjectPrincipalId: aiFoundry.outputs.projectPrincipalId
   }
 }
 
@@ -188,6 +193,9 @@ output functionAppName string = functionApp.outputs.name
 output functionAppHostname string = functionApp.outputs.defaultHostname
 output speechServiceEndpoint string = speechServices.outputs.endpoint
 output aiFoundryEndpoint string = aiFoundry.outputs.endpoint
+output aiFoundryProjectName string = aiFoundry.outputs.projectName
+output aiFoundryProjectEndpoint string = aiFoundry.outputs.projectEndpoint
+output aiFoundryGpt4oMiniDeployment string = aiFoundry.outputs.gpt4oMiniDeploymentName
 output keyVaultUri string = keyVault.outputs.uri
 output storageAccountName string = storageAccount.outputs.name
 output appInsightsName string = appInsights.outputs.name

@@ -2,7 +2,7 @@
 // Role Assignments Module
 // ============================================================================
 // RBAC role assignments for managed identity authentication
-// Enables passwordless access from Function App to other Azure services
+// Enables passwordless access from Function App and Foundry Project to Azure services
 // ============================================================================
 
 @description('Principal ID of the Function App managed identity')
@@ -20,6 +20,9 @@ param speechServiceName string
 @description('Name of the AI Services account')
 param aiServicesName string
 
+@description('Principal ID of the Foundry Project managed identity')
+param foundryProjectPrincipalId string = ''
+
 // Deploying user principal ID (Hammad Aslam)
 var deployingUserPrincipalId = '716e5244-7a36-4bef-9fe6-18f8b62f3cce'
 
@@ -29,6 +32,8 @@ var deployingUserPrincipalId = '716e5244-7a36-4bef-9fe6-18f8b62f3cce'
 
 // Storage roles
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'  // Required for AzureWebJobsStorage identity-based auth
+var storageAccountContributorRoleId = '17d1049b-9a84-46fb-8f53-869881c3d3ab'  // Required for management operations
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 
@@ -38,6 +43,8 @@ var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 // Cognitive Services roles
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68'
+var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
 
 // ============================================================================
 // EXISTING RESOURCES
@@ -69,6 +76,28 @@ resource storageBlobDataContributor 'Microsoft.Authorization/roleAssignments@202
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Storage Blob Data Owner - Required for AzureWebJobsStorage with managed identity
+resource storageBlobDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionAppPrincipalId, storageBlobDataOwnerRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Storage Account Contributor - Required for management operations with managed identity
+resource storageAccountContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionAppPrincipalId, storageAccountContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageAccountContributorRoleId)
     principalId: functionAppPrincipalId
     principalType: 'ServicePrincipal'
   }
@@ -153,6 +182,43 @@ resource aiServicesContributor 'Microsoft.Authorization/roleAssignments@2022-04-
 }
 
 // ============================================================================
+// OPENAI MODEL ACCESS ROLE ASSIGNMENTS (Multi-Agent Support)
+// ============================================================================
+
+// Cognitive Services OpenAI User - for Function App to access GPT-4o-mini
+resource aiServicesOpenAIUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, functionAppPrincipalId, cognitiveServicesOpenAIUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI Contributor - for Function App to manage deployments if needed
+resource aiServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, functionAppPrincipalId, cognitiveServicesOpenAIContributorRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI User - for deploying user to access GPT-4o-mini
+resource userAiServicesOpenAIAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, deployingUserPrincipalId, cognitiveServicesOpenAIUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: deployingUserPrincipalId
+    principalType: 'User'
+  }
+}
+
+// ============================================================================
 // DEPLOYING USER ROLE ASSIGNMENTS
 // ============================================================================
 
@@ -168,17 +234,75 @@ resource userAiServicesAccess 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 
 // ============================================================================
+// FOUNDRY PROJECT ROLE ASSIGNMENTS (Multi-Agent Support)
+// ============================================================================
+// These roles enable the Foundry Project's managed identity to access
+// required resources for multi-agent orchestration
+// ============================================================================
+
+// Cognitive Services OpenAI User - for Foundry Project to use GPT-4o-mini
+resource foundryProjectOpenAIUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(foundryProjectPrincipalId)) {
+  name: guid(aiServices.id, foundryProjectPrincipalId, cognitiveServicesOpenAIUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: foundryProjectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services User - for Foundry Project to access AI Services
+resource foundryProjectCogServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(foundryProjectPrincipalId)) {
+  name: guid(aiServices.id, foundryProjectPrincipalId, cognitiveServicesUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalId: foundryProjectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Storage Blob Data Contributor - for Foundry Project agents to read/write files
+resource foundryProjectStorageBlobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(foundryProjectPrincipalId)) {
+  name: guid(storageAccount.id, foundryProjectPrincipalId, storageBlobDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: foundryProjectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Key Vault Secrets User - for Foundry Project to read secrets if needed
+resource foundryProjectKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(foundryProjectPrincipalId)) {
+  name: guid(keyVault.id, foundryProjectPrincipalId, keyVaultSecretsUserRoleId)
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: foundryProjectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ============================================================================
 // OUTPUTS
 // ============================================================================
 
 @description('List of role assignments created')
 output roleAssignments array = [
-  'Storage Blob Data Contributor'
-  'Storage Queue Data Contributor'
-  'Storage Table Data Contributor'
-  'Key Vault Secrets User'
-  'Cognitive Services User (Speech)'
-  'Cognitive Services User (AI Services)'
-  'Cognitive Services Contributor (AI Services)'
+  'Storage Blob Data Contributor (Function App)'
+  'Storage Queue Data Contributor (Function App)'
+  'Storage Table Data Contributor (Function App)'
+  'Key Vault Secrets User (Function App)'
+  'Cognitive Services User (Speech - Function App)'
+  'Cognitive Services User (AI Services - Function App)'
+  'Cognitive Services Contributor (AI Services - Function App)'
+  'Cognitive Services OpenAI User (AI Services - Function App)'
+  'Cognitive Services OpenAI Contributor (AI Services - Function App)'
   'Cognitive Services User (AI Services - Deploying User)'
+  'Cognitive Services OpenAI User (AI Services - Deploying User)'
+  'Cognitive Services OpenAI User (AI Services - Foundry Project)'
+  'Cognitive Services User (AI Services - Foundry Project)'
+  'Storage Blob Data Contributor (Foundry Project)'
+  'Key Vault Secrets User (Foundry Project)'
 ]

@@ -68,6 +68,83 @@ public class JobResultDto
 }
 
 /// <summary>
+/// Subtitle validation result from the AI agent.
+/// </summary>
+public class SubtitleValidationResult
+{
+    public bool IsValid { get; set; }
+    public double ConfidenceScore { get; set; }
+    public List<ValidationIssue> Issues { get; set; } = new();
+    public string Reasoning { get; set; } = string.Empty;
+    public DateTime ValidatedAt { get; set; }
+    public int SourceCueCount { get; set; }
+    public int TargetCueCount { get; set; }
+    public int SourceWordCount { get; set; }
+    public int TargetWordCount { get; set; }
+    public ValidationCategoryScores? CategoryScores { get; set; }
+}
+
+/// <summary>
+/// Validation scores by category.
+/// </summary>
+public class ValidationCategoryScores
+{
+    public double TimingScore { get; set; }
+    public double TranslationAccuracyScore { get; set; }
+    public double GrammarScore { get; set; }
+    public double FormattingScore { get; set; }
+    public double CulturalContextScore { get; set; }
+}
+
+/// <summary>
+/// A validation issue found in subtitles.
+/// </summary>
+public class ValidationIssue
+{
+    public int Severity { get; set; }
+    public int Category { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string? Timestamp { get; set; }
+    public string? SuggestedFix { get; set; }
+    
+    /// <summary>
+    /// Gets the severity as a display string.
+    /// </summary>
+    public string SeverityText => Severity switch
+    {
+        0 => "Low",
+        1 => "Medium",
+        2 => "High",
+        3 => "Critical",
+        _ => "Unknown"
+    };
+    
+    /// <summary>
+    /// Gets the category as a display string.
+    /// </summary>
+    public string CategoryText => Category switch
+    {
+        0 => "Timing",
+        1 => "Grammar",
+        2 => "TranslationAccuracy",
+        3 => "CulturalContext",
+        4 => "Formatting",
+        5 => "ContentAppropriateness",
+        6 => "MissingContent",
+        _ => "Unknown"
+    };
+}
+
+/// <summary>
+/// Response from validation endpoint.
+/// </summary>
+public class ValidationResponse
+{
+    public string JobId { get; set; } = string.Empty;
+    public SubtitleValidationResult ValidationResult { get; set; } = new();
+}
+
+/// <summary>
 /// List of jobs response.
 /// </summary>
 public class JobListResponse
