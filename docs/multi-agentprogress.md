@@ -35,8 +35,9 @@ This document tracks the implementation progress of the multi-agent architecture
 |------|--------|------|-------|
 | Create `multiagent` branch | ✅ Complete | 2026-01-13 | Branch created and checked out |
 | Update ai-foundry.bicep | ✅ Complete | 2026-01-13 | Added GPT-4o-mini deployment |
-| Update role-assignments.bicep | ✅ Complete | 2026-01-13 | Added OpenAI User/Contributor roles |
-| Update main.bicep outputs | ✅ Complete | 2026-01-13 | Added gpt4oMiniDeployment output |
+| Add Foundry Project | ✅ Complete | 2026-01-13 | `video-translation-agents` project |
+| Update role-assignments.bicep | ✅ Complete | 2026-01-13 | Added OpenAI + Foundry Project roles |
+| Update main.bicep outputs | ✅ Complete | 2026-01-13 | Added project endpoint outputs |
 | Deploy infrastructure | 🔄 Pending | - | Ready for deployment |
 | Add Agent Framework packages | ⬜ Not Started | - | `Microsoft.Agents.AI.AzureAI --prerelease` |
 | Configure Foundry connection | ⬜ Not Started | - | Managed identity auth |
@@ -47,16 +48,23 @@ This document tracks the implementation progress of the multi-agent architecture
 - Added GPT-4o-mini deployment (Standard SKU, 10K TPM capacity)
 - Model: `gpt-4o-mini` version `2024-07-18`
 - Auto-upgrade enabled for new versions
-- New outputs: `gpt4oMiniDeploymentName`, `gpt4oMiniDeploymentId`
+- **Added Foundry Project** `video-translation-agents` with system-assigned managed identity
+- New outputs: `gpt4oMiniDeploymentName`, `gpt4oMiniDeploymentId`, `projectName`, `projectEndpoint`, `projectPrincipalId`
 
 #### role-assignments.bicep
 - Added `Cognitive Services OpenAI User` role for Function App
 - Added `Cognitive Services OpenAI Contributor` role for Function App
 - Added `Cognitive Services OpenAI User` role for deploying user
-- These roles enable GPT-4o-mini access via managed identity
+- **Added Foundry Project RBAC roles:**
+  - `Cognitive Services OpenAI User` - access GPT-4o-mini
+  - `Cognitive Services User` - access AI Services
+  - `Storage Blob Data Contributor` - read/write subtitle files
+  - `Key Vault Secrets User` - read secrets if needed
 
 #### main.bicep
 - Added `aiFoundryGpt4oMiniDeployment` output
+- Added `aiFoundryProjectName` output
+- Added `aiFoundryProjectEndpoint` output
 
 ---
 
@@ -157,11 +165,22 @@ dotnet add package Azure.AI.Projects --prerelease
 | Setting | Description |
 |---------|-------------|
 | `AzureAI__Endpoint` | AI Services endpoint (from deployment output) |
+| `AzureAI__ProjectEndpoint` | Foundry Project endpoint for Agent SDK |
 | `AzureAI__DeploymentName` | `gpt-4o-mini` |
+
+### Foundry Project Details
+
+| Property | Value |
+|----------|-------|
+| **Project Name** | `video-translation-agents` |
+| **Display Name** | Video Translation Multi-Agent Project |
+| **Identity Type** | System-assigned managed identity |
+| **Endpoint Pattern** | `https://{account}.cognitiveservices.azure.com/agents/v1.0/projects/{project}` |
 
 ### Authentication
 - **Method**: Managed Identity (DefaultAzureCredential)
-- **Roles**: Cognitive Services OpenAI User, Cognitive Services OpenAI Contributor
+- **Function App Roles**: Cognitive Services OpenAI User, Cognitive Services OpenAI Contributor
+- **Foundry Project Roles**: Cognitive Services OpenAI User, Storage Blob Data Contributor, Key Vault Secrets User
 
 ---
 
@@ -210,3 +229,6 @@ az cognitiveservices account deployment list `
 | 2026-01-13 | Added GPT-4o-mini deployment to bicep | Copilot |
 | 2026-01-13 | Added OpenAI RBAC roles for managed identity | Copilot |
 | 2026-01-13 | Created progress tracking document | Copilot |
+| 2026-01-13 | Added Foundry Project `video-translation-agents` | Copilot |
+| 2026-01-13 | Added Foundry Project RBAC roles (OpenAI, Storage, KeyVault) | Copilot |
+| 2026-01-13 | Updated main.bicep with project endpoint outputs | Copilot |
