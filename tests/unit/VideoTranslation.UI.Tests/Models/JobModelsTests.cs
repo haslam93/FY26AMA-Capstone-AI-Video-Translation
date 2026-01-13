@@ -52,8 +52,8 @@ public class JobModelsTests
         var result = new JobResultDto
         {
             TranslatedVideoUrl = "https://example.com/translated.mp4",
-            SourceWebVttUrl = "https://example.com/source.vtt",
-            TargetWebVttUrl = "https://example.com/target.vtt"
+            SourceSubtitleUrl = "https://example.com/source.vtt",
+            TargetSubtitleUrl = "https://example.com/target.vtt"
         };
 
         // Act
