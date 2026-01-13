@@ -1,0 +1,212 @@
+# Multi-Agent Architecture Progress
+
+## Overview
+This document tracks the implementation progress of the multi-agent architecture for the Video Translation Service. The goal is to enhance the existing Durable Functions orchestration with AI-powered agents for improved subtitle validation and human-in-the-loop approval workflows.
+
+---
+
+## Target Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        SUPERVISOR AGENT                                   │
+│  (Coordinates workflow, delegates tasks, manages agent communication)    │
+└──────────────────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  TRANSLATION    │  │    SUBTITLE     │  │   HUMAN-IN-    │
+│     AGENT       │  │   VALIDATION    │  │   THE-LOOP     │
+│                 │  │     AGENT       │  │   COMPONENT    │
+│ • Create job    │  │ • Analyze VTT   │  │ • Review queue │
+│ • Monitor       │  │ • Check timing  │  │ • Approve/Reject│
+│ • Copy outputs  │  │ • Validate sync │  │ • Edit subtitles│
+└─────────────────┘  │ • Quality score │  │ • Final decision│
+                     └─────────────────┘  └─────────────────┘
+```
+
+---
+
+## Phase 1: Foundation & Infrastructure ✅ IN PROGRESS
+
+### Tasks
+
+| Task | Status | Date | Notes |
+|------|--------|------|-------|
+| Create `multiagent` branch | ✅ Complete | 2026-01-13 | Branch created and checked out |
+| Update ai-foundry.bicep | ✅ Complete | 2026-01-13 | Added GPT-4o-mini deployment |
+| Update role-assignments.bicep | ✅ Complete | 2026-01-13 | Added OpenAI User/Contributor roles |
+| Update main.bicep outputs | ✅ Complete | 2026-01-13 | Added gpt4oMiniDeployment output |
+| Deploy infrastructure | 🔄 Pending | - | Ready for deployment |
+| Add Agent Framework packages | ⬜ Not Started | - | `Microsoft.Agents.AI.AzureAI --prerelease` |
+| Configure Foundry connection | ⬜ Not Started | - | Managed identity auth |
+
+### Infrastructure Changes Made
+
+#### ai-foundry.bicep
+- Added GPT-4o-mini deployment (Standard SKU, 10K TPM capacity)
+- Model: `gpt-4o-mini` version `2024-07-18`
+- Auto-upgrade enabled for new versions
+- New outputs: `gpt4oMiniDeploymentName`, `gpt4oMiniDeploymentId`
+
+#### role-assignments.bicep
+- Added `Cognitive Services OpenAI User` role for Function App
+- Added `Cognitive Services OpenAI Contributor` role for Function App
+- Added `Cognitive Services OpenAI User` role for deploying user
+- These roles enable GPT-4o-mini access via managed identity
+
+#### main.bicep
+- Added `aiFoundryGpt4oMiniDeployment` output
+
+---
+
+## Phase 2: Supervisor Agent ⬜ NOT STARTED
+
+### Tasks
+
+| Task | Status | Date | Notes |
+|------|--------|------|-------|
+| Create SupervisorAgent class | ⬜ Not Started | - | Workflow coordinator |
+| Define workflow graph | ⬜ Not Started | - | Agent edges and message flow |
+| Integrate with Orchestrator | ⬜ Not Started | - | Wrap existing logic |
+| Add state management | ⬜ Not Started | - | Multi-agent workflow state |
+
+### Planned Files
+- `src/Api/Agents/SupervisorAgent.cs`
+- `src/Api/Models/TranslationWorkflowState.cs`
+
+---
+
+## Phase 3: Subtitle Validation Agent ⬜ NOT STARTED
+
+### Tasks
+
+| Task | Status | Date | Notes |
+|------|--------|------|-------|
+| Create SubtitleValidationAgent | ⬜ Not Started | - | GPT-4o-mini powered |
+| Implement VTT parsing | ⬜ Not Started | - | Parse WebVTT files |
+| Define validation prompts | ⬜ Not Started | - | Quality scoring prompts |
+| Create ValidationResult model | ⬜ Not Started | - | Score, issues, recommendations |
+| Add to workflow | ⬜ Not Started | - | After translation |
+
+### Model Selection Rationale
+- **Model**: GPT-4o-mini
+- **Cost**: $0.26/1M tokens (economical for validation tasks)
+- **Quality**: 0.7193 quality index (sufficient for text analysis)
+- **Latency**: 0.89s TTFT (fast for UX)
+- **Context**: 131K input (handles large subtitle files)
+
+### Planned Files
+- `src/Api/Agents/SubtitleValidationAgent.cs`
+- `src/Api/Models/ValidationResult.cs`
+- `src/Api/Services/VttParsingService.cs`
+
+---
+
+## Phase 4: Human-in-the-Loop ⬜ NOT STARTED
+
+### Tasks
+
+| Task | Status | Date | Notes |
+|------|--------|------|-------|
+| Create Review Queue API | ⬜ Not Started | - | GET/POST endpoints |
+| Build Review UI page | ⬜ Not Started | - | Blazor review page |
+| Implement approval workflow | ⬜ Not Started | - | Pause/resume orchestration |
+| Add subtitle editing | ⬜ Not Started | - | In-browser VTT editor |
+| Create notification system | ⬜ Not Started | - | Email/Teams notifications |
+
+### Planned Files
+- `src/Api/Functions/ReviewFunctions.cs`
+- `src/Api/Models/ReviewDecision.cs`
+- `src/ui/Pages/Reviews.razor`
+- `src/ui/Pages/ReviewDetails.razor`
+- `src/ui/Components/SubtitleEditor.razor`
+
+---
+
+## Phase 5: Integration & Testing ⬜ NOT STARTED
+
+### Tasks
+
+| Task | Status | Date | Notes |
+|------|--------|------|-------|
+| End-to-end workflow testing | ⬜ Not Started | - | Full multi-agent flow |
+| Update existing tests | ⬜ Not Started | - | Modify unit tests |
+| Add integration tests | ⬜ Not Started | - | Agent interaction tests |
+| Update documentation | ⬜ Not Started | - | Architecture docs |
+
+---
+
+## Required NuGet Packages
+
+```bash
+# Agent Framework (preview)
+dotnet add package Microsoft.Agents.AI.AzureAI --prerelease
+dotnet add package Microsoft.Agents.AI.Workflows --prerelease
+
+# Azure AI Projects SDK
+dotnet add package Azure.AI.Projects --prerelease
+```
+
+---
+
+## Environment Configuration
+
+### Required App Settings (after deployment)
+
+| Setting | Description |
+|---------|-------------|
+| `AzureAI__Endpoint` | AI Services endpoint (from deployment output) |
+| `AzureAI__DeploymentName` | `gpt-4o-mini` |
+
+### Authentication
+- **Method**: Managed Identity (DefaultAzureCredential)
+- **Roles**: Cognitive Services OpenAI User, Cognitive Services OpenAI Contributor
+
+---
+
+## Effort Estimates
+
+| Phase | Description | LoE |
+|-------|-------------|-----|
+| Phase 1 | Foundation & Setup | 2-3 days |
+| Phase 2 | Supervisor Agent | 2-3 days |
+| Phase 3 | Subtitle Validation Agent | 3-4 days |
+| Phase 4 | Human-in-the-Loop | 4-5 days |
+| Phase 5 | Integration & Testing | 2-3 days |
+| **Total** | **Full Implementation** | **13-18 days** |
+
+---
+
+## Deployment Commands
+
+### Deploy Infrastructure (Incremental)
+```powershell
+# From infra/ directory
+az deployment sub create `
+  --location eastus2 `
+  --template-file main.bicep `
+  --parameters deploymentNumber=3
+
+# Or use the deploy script
+.\deploy.ps1 -DeploymentNumber 3
+```
+
+### Verify GPT-4o-mini Deployment
+```powershell
+az cognitiveservices account deployment list `
+  --resource-group AMAFY26-deployment-3 `
+  --name AIServices-AMA-3 `
+  --output table
+```
+
+---
+
+## Change Log
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-01-13 | Created multiagent branch | Copilot |
+| 2026-01-13 | Added GPT-4o-mini deployment to bicep | Copilot |
+| 2026-01-13 | Added OpenAI RBAC roles for managed identity | Copilot |
+| 2026-01-13 | Created progress tracking document | Copilot |

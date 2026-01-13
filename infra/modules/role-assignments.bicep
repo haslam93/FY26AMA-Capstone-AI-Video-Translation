@@ -38,6 +38,8 @@ var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 // Cognitive Services roles
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68'
+var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
 
 // ============================================================================
 // EXISTING RESOURCES
@@ -153,6 +155,43 @@ resource aiServicesContributor 'Microsoft.Authorization/roleAssignments@2022-04-
 }
 
 // ============================================================================
+// OPENAI MODEL ACCESS ROLE ASSIGNMENTS (Multi-Agent Support)
+// ============================================================================
+
+// Cognitive Services OpenAI User - for Function App to access GPT-4o-mini
+resource aiServicesOpenAIUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, functionAppPrincipalId, cognitiveServicesOpenAIUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI Contributor - for Function App to manage deployments if needed
+resource aiServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, functionAppPrincipalId, cognitiveServicesOpenAIContributorRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    principalId: functionAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI User - for deploying user to access GPT-4o-mini
+resource userAiServicesOpenAIAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiServices.id, deployingUserPrincipalId, cognitiveServicesOpenAIUserRoleId)
+  scope: aiServices
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: deployingUserPrincipalId
+    principalType: 'User'
+  }
+}
+
+// ============================================================================
 // DEPLOYING USER ROLE ASSIGNMENTS
 // ============================================================================
 
@@ -180,5 +219,8 @@ output roleAssignments array = [
   'Cognitive Services User (Speech)'
   'Cognitive Services User (AI Services)'
   'Cognitive Services Contributor (AI Services)'
+  'Cognitive Services OpenAI User (AI Services - Function App)'
+  'Cognitive Services OpenAI Contributor (AI Services - Function App)'
   'Cognitive Services User (AI Services - Deploying User)'
+  'Cognitive Services OpenAI User (AI Services - Deploying User)'
 ]

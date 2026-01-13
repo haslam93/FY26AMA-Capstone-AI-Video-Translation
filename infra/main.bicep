@@ -188,6 +188,7 @@ output functionAppName string = functionApp.outputs.name
 output functionAppHostname string = functionApp.outputs.defaultHostname
 output speechServiceEndpoint string = speechServices.outputs.endpoint
 output aiFoundryEndpoint string = aiFoundry.outputs.endpoint
+output aiFoundryGpt4oMiniDeployment string = aiFoundry.outputs.gpt4oMiniDeploymentName
 output keyVaultUri string = keyVault.outputs.uri
 output storageAccountName string = storageAccount.outputs.name
 output appInsightsName string = appInsights.outputs.name
