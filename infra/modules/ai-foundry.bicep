@@ -35,7 +35,7 @@ param projectName string = 'video-translation-agents'
 // AI SERVICES ACCOUNT (Hub)
 // ============================================================================
 
-resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   name: accountName
   location: location
   tags: tags
