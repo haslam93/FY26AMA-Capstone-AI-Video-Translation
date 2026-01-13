@@ -160,6 +160,10 @@ module functionApp 'modules/function-app.bicep' = {
       'https://portal.azure.com'
       'https://${staticWebApp.outputs.defaultHostname}'
     ]
+    // AI Foundry settings for multi-agent architecture
+    aiFoundryProjectEndpoint: aiFoundry.outputs.projectEndpoint
+    aiFoundryOpenAIEndpoint: 'https://${aiFoundry.outputs.accountName}.openai.azure.com'
+    aiFoundryModelDeploymentName: aiFoundry.outputs.gpt4oMiniDeploymentName
   }
 }
 

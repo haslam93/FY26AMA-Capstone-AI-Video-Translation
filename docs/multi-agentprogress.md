@@ -101,17 +101,47 @@ This document tracks the implementation progress of the multi-agent architecture
 
 ---
 
-## Phase 3: Subtitle Validation Agent ⬜ NOT STARTED
+## Phase 3: Subtitle Validation Agent ✅ COMPLETE & DEPLOYED
 
 ### Tasks
 
 | Task | Status | Date | Notes |
 |------|--------|------|-------|
-| Create SubtitleValidationAgent | ⬜ Not Started | - | GPT-4o-mini powered |
-| Implement VTT parsing | ⬜ Not Started | - | Parse WebVTT files |
-| Define validation prompts | ⬜ Not Started | - | Quality scoring prompts |
-| Create ValidationResult model | ⬜ Not Started | - | Score, issues, recommendations |
-| Add to workflow | ⬜ Not Started | - | After translation |
+| Create SubtitleValidationAgent | ✅ Complete | 2026-01-13 | GPT-4o-mini powered with semantic analysis |
+| Implement VTT parsing | ✅ Complete | 2026-01-13 | `VttParsingService` for WebVTT parsing |
+| Define validation prompts | ✅ Complete | 2026-01-13 | Quality scoring prompts for 5 categories |
+| Create ValidationResult model | ✅ Complete | 2026-01-13 | Score, issues, category scores, stats |
+| Add API endpoints | ✅ Complete | 2026-01-13 | `POST /api/jobs/{jobId}/validate`, `POST /api/validate` |
+| Update UI | ✅ Complete | 2026-01-13 | Quality score display with category breakdown |
+| Fix storage managed identity | ✅ Complete | 2026-01-13 | Identity-based blob access in VttParsingService |
+| Fix GPT response parsing | ✅ Complete | 2026-01-13 | Added JsonStringEnumConverter for severity/category |
+| Fix UI deserialization | ✅ Complete | 2026-01-13 | Changed Severity/Category to int with display props |
+| Add Bootstrap JS | ✅ Complete | 2026-01-13 | Fixed accordion expand/collapse in UI |
+| Add AI Foundry to Bicep | ✅ Complete | 2026-01-13 | Settings now in function-app.bicep for IaC |
+| Deploy & validate end-to-end | ✅ Complete | 2026-01-13 | Full workflow tested successfully |
+
+### Files Created/Modified
+
+#### API (Backend)
+- `src/Api/Services/VttParsingService.cs` - WebVTT parsing service with cue extraction
+- `src/Api/Agents/SubtitleValidationAgent.cs` - GPT-4o-mini powered validation agent
+- `src/Api/Functions/ValidationFunctions.cs` - HTTP trigger functions for validation
+- `src/Api/Models/TranslationWorkflowState.cs` - Updated with `ValidationCategoryScores`
+- `src/Api/Program.cs` - Added DI registration for validation services
+
+#### UI (Frontend)
+- `src/ui/Models/JobModels.cs` - Added `SubtitleValidationResult`, `ValidationCategoryScores`, `ValidationIssue`
+- `src/ui/Services/TranslationApiService.cs` - Added `ValidateSubtitlesAsync` method
+- `src/ui/Pages/JobDetails.razor` - Added AI Quality Validation section with score visualization
+
+### Validation Categories
+| Category | Weight | Description |
+|----------|--------|-------------|
+| Translation Accuracy | 35% | Semantic accuracy of translation |
+| Grammar | 20% | Grammar and spelling in target language |
+| Timing | 20% | Subtitle synchronization |
+| Cultural Context | 15% | Idiom and cultural adaptation |
+| Formatting | 10% | Line length and readability |
 
 ### Model Selection Rationale
 - **Model**: GPT-4o-mini
@@ -119,6 +149,31 @@ This document tracks the implementation progress of the multi-agent architecture
 - **Quality**: 0.7193 quality index (sufficient for text analysis)
 - **Latency**: 0.89s TTFT (fast for UX)
 - **Context**: 131K input (handles large subtitle files)
+
+### Deployment Issues Resolved
+
+| Issue | Root Cause | Solution |
+|-------|------------|----------|
+| Function App 503 errors | Azure policy blocked key-based storage | Changed to identity-based auth (`AzureWebJobsStorage__*` settings) |
+| VTT file download 409 errors | Function App couldn't access private blobs | Added `BlobServiceClient` with `DefaultAzureCredential` in VttParsingService |
+| UI not showing validation | Blazor app not deployed | Published and deployed UI to Static Web App |
+| Deserialization errors | API returns int, UI expected string | Changed `Severity`/`Category` to int with `SeverityText`/`CategoryText` display properties |
+| GPT response parsing failed | GPT wraps JSON in markdown code fences | Added `ExtractJsonFromResponse` helper + `JsonStringEnumConverter` |
+| Accordion not expanding | Bootstrap JS missing | Added Bootstrap 5.3.3 JS bundle to index.html |
+| Settings lost on redeploy | AI Foundry settings manually configured | Added settings to function-app.bicep for IaC |
+
+### Files Modified During Deployment
+
+| File | Changes |
+|------|---------|
+| `infra/modules/function-app.bicep` | Identity-based storage + AI Foundry app settings |
+| `infra/modules/role-assignments.bicep` | Added Storage Blob Data Owner, Storage Account Contributor |
+| `infra/main.bicep` | Pass AI Foundry params to Function App module |
+| `src/Api/Services/VttParsingService.cs` | Managed identity blob access with `BlobServiceClient` |
+| `src/Api/Agents/SubtitleValidationAgent.cs` | `JsonStringEnumConverter`, `ExtractJsonFromResponse` |
+| `src/ui/Models/JobModels.cs` | Severity/Category as int with display properties |
+| `src/ui/Pages/JobDetails.razor` | Use `SeverityText`/`CategoryText`, int-based `GetSeverityBadgeClass` |
+| `src/ui/wwwroot/index.html` | Added Bootstrap 5.3.3 JS bundle |
 
 ### Planned Files
 - `src/Api/Agents/SubtitleValidationAgent.cs`
@@ -176,13 +231,19 @@ dotnet add package Azure.AI.Projects --prerelease
 
 ## Environment Configuration
 
-### Required App Settings (after deployment)
+### App Settings (Now in Bicep - Automatically Deployed)
 
-| Setting | Description |
-|---------|-------------|
-| `AIFoundry__ProjectEndpoint` | Foundry Project endpoint (e.g., `https://aiservices-ama-3.services.ai.azure.com/api/projects/video-translation-agents`) |
-| `AIFoundry__OpenAIEndpoint` | Azure OpenAI endpoint (e.g., `https://aiservices-ama-3.openai.azure.com`) |
-| `AIFoundry__ModelDeploymentName` | `gpt-4o-mini` |
+The following settings are now configured in `infra/modules/function-app.bicep` and automatically deployed:
+
+| Setting | Description | Bicep Source |
+|---------|-------------|--------------|
+| `AIFoundry__ProjectEndpoint` | Foundry Project endpoint | `aiFoundry.outputs.projectEndpoint` |
+| `AIFoundry__OpenAIEndpoint` | Azure OpenAI endpoint | `https://${aiFoundry.outputs.accountName}.openai.azure.com` |
+| `AIFoundry__ModelDeploymentName` | `gpt-4o-mini` | `aiFoundry.outputs.gpt4oMiniDeploymentName` |
+| `AzureWebJobsStorage__accountName` | Storage account name | `storageAccount.outputs.name` |
+| `AzureWebJobsStorage__blobServiceUri` | Blob service URI | Auto-generated from account name |
+| `AzureWebJobsStorage__queueServiceUri` | Queue service URI | Auto-generated from account name |
+| `AzureWebJobsStorage__tableServiceUri` | Table service URI | Auto-generated from account name |
 
 ### Foundry Project Details
 
@@ -256,3 +317,24 @@ az cognitiveservices account deployment list `
 | 2026-01-14 | Created TranslationWorkflowState model | Copilot |
 | 2026-01-14 | Updated Program.cs with agent DI registration | Copilot |
 | 2026-01-14 | Updated local.settings.json with Foundry config | Copilot |
+| 2026-01-13 | **Phase 3 Started** - Subtitle Validation Agent | Copilot |
+| 2026-01-13 | Created VttParsingService for WebVTT file parsing | Copilot |
+| 2026-01-13 | Created SubtitleValidationAgent with GPT-4o-mini integration | Copilot |
+| 2026-01-13 | Created ValidationFunctions.cs with validation API endpoints | Copilot |
+| 2026-01-13 | Updated TranslationWorkflowState with ValidationCategoryScores | Copilot |
+| 2026-01-13 | Updated Program.cs with VttParsingService and SubtitleValidationAgent DI | Copilot |
+| 2026-01-13 | Updated UI JobModels.cs with validation DTOs | Copilot |
+| 2026-01-13 | Updated TranslationApiService with ValidateSubtitlesAsync method | Copilot |
+| 2026-01-13 | Updated JobDetails.razor with AI Quality Validation section | Copilot |
+| 2026-01-13 | **Phase 3 Complete** - API and UI builds succeeded | Copilot |
+| 2026-01-13 | Fixed storage auth - changed to identity-based AzureWebJobsStorage | Copilot |
+| 2026-01-13 | Added Storage Blob Data Owner and Storage Account Contributor roles | Copilot |
+| 2026-01-13 | Updated VttParsingService for managed identity blob access | Copilot |
+| 2026-01-13 | Deployed Function App with AI Foundry settings | Copilot |
+| 2026-01-13 | Deployed Blazor UI to Static Web App | Copilot |
+| 2026-01-13 | Fixed deserialization - changed Severity/Category to int in UI | Copilot |
+| 2026-01-13 | Added JsonStringEnumConverter for GPT response parsing | Copilot |
+| 2026-01-13 | Added Bootstrap JS bundle for accordion functionality | Copilot |
+| 2026-01-13 | Added AI Foundry settings to function-app.bicep for IaC | Copilot |
+| 2026-01-13 | Updated main.bicep to pass AI Foundry params to Function App | Copilot |
+| 2026-01-13 | **Phase 3 Deployed & Validated** - End-to-end workflow tested | Copilot |

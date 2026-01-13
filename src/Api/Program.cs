@@ -62,6 +62,12 @@ builder.Services.AddAzureClients(clientBuilder =>
 // Uses Azure AI Foundry with GPT-4o-mini
 builder.Services.AddSingleton<IAgentConfiguration, AgentConfigurationService>();
 
+// Register VTT Parsing Service for subtitle analysis
+builder.Services.AddHttpClient<IVttParsingService, VttParsingService>();
+
+// Register Subtitle Validation Agent
+builder.Services.AddScoped<ISubtitleValidationAgent, SubtitleValidationAgent>();
+
 // Add Application Insights
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()

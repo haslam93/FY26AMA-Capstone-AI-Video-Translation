@@ -153,6 +153,42 @@ public class SubtitleValidationResult
 
     /// <summary>Timestamp of validation.</summary>
     public DateTime ValidatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Number of cues in the source subtitle file.</summary>
+    public int SourceCueCount { get; set; }
+
+    /// <summary>Number of cues in the target subtitle file.</summary>
+    public int TargetCueCount { get; set; }
+
+    /// <summary>Total word count in source subtitles.</summary>
+    public int SourceWordCount { get; set; }
+
+    /// <summary>Total word count in target subtitles.</summary>
+    public int TargetWordCount { get; set; }
+
+    /// <summary>Detailed scores by category.</summary>
+    public ValidationCategoryScores? CategoryScores { get; set; }
+}
+
+/// <summary>
+/// Detailed validation scores by category.
+/// </summary>
+public class ValidationCategoryScores
+{
+    /// <summary>Score for timing and synchronization (0.0-1.0).</summary>
+    public double TimingScore { get; set; }
+
+    /// <summary>Score for translation accuracy (0.0-1.0).</summary>
+    public double TranslationAccuracyScore { get; set; }
+
+    /// <summary>Score for grammar and spelling (0.0-1.0).</summary>
+    public double GrammarScore { get; set; }
+
+    /// <summary>Score for formatting and readability (0.0-1.0).</summary>
+    public double FormattingScore { get; set; }
+
+    /// <summary>Score for cultural context adaptation (0.0-1.0).</summary>
+    public double CulturalContextScore { get; set; }
 }
 
 /// <summary>

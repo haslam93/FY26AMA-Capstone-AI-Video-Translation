@@ -13,6 +13,7 @@ public interface ITranslationApiService
     Task<JobStatusResponse?> GetJobStatusAsync(string jobId);
     Task<JobListResponse?> ListJobsAsync();
     Task<UploadResponse?> UploadVideoAsync(Stream fileStream, string fileName, IProgress<int>? progress = null);
+    Task<ValidationResponse?> ValidateSubtitlesAsync(string jobId);
 }
 
 /// <summary>
@@ -52,6 +53,13 @@ public class TranslationApiService : ITranslationApiService
         var response = await _httpClient.PostAsync($"api/upload?filename={Uri.EscapeDataString(fileName)}", content);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<UploadResponse>();
+    }
+
+    public async Task<ValidationResponse?> ValidateSubtitlesAsync(string jobId)
+    {
+        var response = await _httpClient.PostAsync($"api/jobs/{jobId}/validate", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ValidationResponse>();
     }
 
     private static string GetContentType(string fileName)
