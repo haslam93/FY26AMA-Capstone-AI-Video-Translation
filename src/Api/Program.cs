@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using VideoTranslation.Api.Agents;
 using VideoTranslation.Api.Services;
 
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -56,6 +57,10 @@ builder.Services.AddAzureClients(clientBuilder =>
 {
     clientBuilder.UseCredential(new DefaultAzureCredential());
 });
+
+// Register Agent Configuration Service for multi-agent orchestration
+// Uses Azure AI Foundry with GPT-4o-mini
+builder.Services.AddSingleton<IAgentConfiguration, AgentConfigurationService>();
 
 // Add Application Insights
 builder.Services
