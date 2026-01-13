@@ -29,6 +29,9 @@ param tags object = {
   deploymentNumber: string(deploymentNumber)
 }
 
+@description('IP addresses allowed to access the application (CIDR format, e.g., "99.232.72.14/32"). Leave empty for public access.')
+param allowedIpAddresses array = []
+
 // ============================================================================
 // VARIABLES - Resource Naming
 // ============================================================================
@@ -141,7 +144,8 @@ module staticWebApp 'modules/static-web-app.bicep' = {
     name: staticWebAppName
     location: location
     tags: tags
-    sku: 'Free'
+    sku: 'Standard'
+    allowedIpAddresses: allowedIpAddresses
   }
 }
 
@@ -156,6 +160,7 @@ module functionApp 'modules/function-app.bicep' = {
     storageAccountName: storageAccount.outputs.name
     appInsightsInstrumentationKey: appInsights.outputs.instrumentationKey
     appInsightsConnectionString: appInsights.outputs.connectionString
+    allowedIpAddresses: allowedIpAddresses
     corsAllowedOrigins: [
       'https://portal.azure.com'
       'https://${staticWebApp.outputs.defaultHostname}'

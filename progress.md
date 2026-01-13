@@ -80,34 +80,24 @@ Building a video translation service with:
 
 ## 📝 Current Task
 
-**Status**: Adding Subtitle Features 🔄
+**Status**: Security Hardening Complete ✅
 
-### Phase 9: Subtitle Enhancements (In Progress)
+### Phase 10: Security Hardening ✅ Complete
 
-**Goal**: Add subtitle support - both as downloadable WebVTT files and burned into video
+**Goal**: Restrict access to authorized IP addresses only
 
 **Tasks**:
-- [x] A) Check logs to verify what subtitle URLs were returned from completed job ✅
-  - **Finding**: Subtitles ARE being stored! Found in blob storage:
-    - `subtitles/7a1b14e65615/iteration-1/source-subtitles.vtt` (408 bytes)
-    - `subtitles/7a1b14e65615/iteration-1/target-subtitles.vtt` (568 bytes)
-    - `subtitles/7a1b14e65615/iteration-1/metadata.json` (2162 bytes)
-  - Issue is the **UI not displaying them**, not the API
-- [x] B) Update UI to display subtitle download links (source & target WebVTT) ✅
-  - Fixed property name mismatch: `SourceWebVttUrl` → `SourceSubtitleUrl`, `TargetWebVttUrl` → `TargetSubtitleUrl`
-  - Updated JobDetails.razor to use correct property names
-- [x] C) Enable `exportSubtitleInVideo` option to burn subtitles into video ✅
-  - API already has `ExportSubtitleInVideo` in `TranslationJobRequest`
-  - Orchestrator already passes it to `CreateIterationActivity`
-  - Activity already passes it to Speech API
-- [x] D) Add checkbox in Create page for "Burn subtitles into video" ✅
-  - Added checkbox to Create.razor with label and helper text
-  - Added "Max Characters Per Subtitle Line" input field
-- [x] E) Deploy and test ✅
-  - API deployed to FuncApp-AMA-3
-  - UI deployed to https://ashy-glacier-0400c0b0f.1.azurestaticapps.net
+- [x] A) Upgrade Static Web App to Standard tier (~$9/month)
+- [x] B) Add IP whitelist to Static Web App via `staticwebapp.config.json`
+- [x] C) Add IP restriction rules to Function App
+- [x] D) Update Bicep templates with `allowedIpAddresses` parameter
+- [x] E) Update documentation (README, architecture, runbook, devops)
 
-### Phase 9: Subtitle Enhancements ✅ Complete
+**Security Configuration**:
+| Resource | IP Whitelisted | Configuration |
+|----------|---------------|---------------|
+| Static Web App | 99.232.72.14/32 | `staticwebapp.config.json` → `networking.allowedIpRanges` |
+| Function App | 99.232.72.14/32 | Azure access restriction rules (Bicep) |
 
 **Azure Resources**:
 | Resource | Name | URL |
@@ -118,6 +108,13 @@ Building a video translation service with:
 | Storage Account | storageama3 | - |
 
 ### Completed Phases
+
+#### Phase 9: Subtitle Enhancements ✅ Complete
+- [x] Fixed UI property names for subtitle URLs
+- [x] Added "Burn subtitles into video" checkbox
+- [x] Added "Max Characters Per Subtitle Line" input
+- [x] Fixed 409 Conflict error (unique operation IDs)
+- [x] Fixed Substring error for operation ID length
 
 #### Phase 8: DevOps Setup ✅ Complete
 - [x] Created CI workflow (ci.yml) - validates Bicep, builds & tests API and UI

@@ -19,7 +19,13 @@ param functionAppHostname string = ''
 
 @description('SKU for the Static Web App')
 @allowed(['Free', 'Standard'])
-param sku string = 'Free'
+param sku string = 'Standard'
+
+@description('IP addresses allowed to access the Static Web App (configured via staticwebapp.config.json networking.allowedIpRanges)')
+param allowedIpAddresses array = []
+
+// Note: IP restrictions for Static Web Apps are configured in staticwebapp.config.json
+// The allowedIpAddresses parameter is for documentation and consistency with Function App
 
 // ============================================================================
 // STATIC WEB APP

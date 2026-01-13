@@ -759,6 +759,44 @@ graph TB
 - ✅ **HTTPS only** - Storage and Function App HTTPS-only
 - ✅ **Soft delete enabled** - Key Vault with purge protection
 - ✅ **Diagnostic logging** - All services log to Log Analytics
+- ✅ **IP Whitelisting** - Function App and Static Web App restricted to authorized IPs
+- ✅ **Network Isolation** - Only whitelisted IPs can access the application
+
+### Network Security
+
+The application implements IP-based access restrictions to limit exposure:
+
+| Resource | Protection | Configuration |
+|----------|-----------|---------------|
+| **Static Web App** | IP Whitelist | `staticwebapp.config.json` → `networking.allowedIpRanges` |
+| **Function App** | IP Restriction Rules | Azure access restrictions via Bicep/Portal |
+| **Storage Account** | Managed Identity | Only Function App can access (no public access needed) |
+| **Speech Service** | API Key + MI | Protected by Key Vault, called only by Function App |
+
+```mermaid
+graph TB
+    subgraph "Internet"
+        User[Authorized User<br/>99.232.72.14]
+        Blocked[Blocked Users<br/>All Other IPs]
+    end
+    
+    subgraph "Azure Edge"
+        SWA[Static Web App<br/>IP Whitelist]
+        FA[Function App<br/>IP Restriction Rules]
+    end
+    
+    subgraph "Internal Services"
+        Storage[Storage Account]
+        Speech[Speech Services]
+    end
+    
+    User -->|Allowed| SWA
+    User -->|Allowed| FA
+    Blocked -.->|403 Forbidden| SWA
+    Blocked -.->|403 Forbidden| FA
+    FA -->|Managed Identity| Storage
+    FA -->|API Key| Speech
+```
 
 ---
 

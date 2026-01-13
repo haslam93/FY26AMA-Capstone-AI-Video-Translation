@@ -331,6 +331,26 @@ az bicep build --file infra/main.bicep
 
 3. **Branch Protection:** Enable branch protection rules for `main` to require CI to pass before merging.
 
+4. **IP Whitelisting:** The application restricts access to authorized IP addresses:
+   - **Static Web App:** Configured in `src/ui/wwwroot/staticwebapp.config.json` via `networking.allowedIpRanges`
+   - **Function App:** Configured via Bicep `allowedIpAddresses` parameter in `infra/main.parameters.json`
+   - When deploying, ensure your IP is in the whitelist or you won't be able to access the application
+
+5. **Updating Allowed IPs:** To add/remove IP addresses:
+   ```bash
+   # For Function App (immediate effect)
+   az functionapp config access-restriction add \
+     --resource-group "AMAFY26-deployment-3" \
+     --name "FuncApp-AMA-3" \
+     --rule-name "AllowNewIP" \
+     --action Allow \
+     --ip-address "NEW.IP.ADDRESS/32" \
+     --priority 101
+   
+   # For Static Web App (requires redeployment)
+   # Edit staticwebapp.config.json and redeploy
+   ```
+
 ## Future Improvements
 
 - [ ] Add integration tests with Azure resources
@@ -338,3 +358,4 @@ az bicep build --file infra/main.bicep
 - [ ] Implement approval gates for production deployments
 - [ ] Add Slack/Teams notifications for deployment status
 - [ ] Add performance/load tests in CI
+- [ ] Implement multi-agent subtitle validation

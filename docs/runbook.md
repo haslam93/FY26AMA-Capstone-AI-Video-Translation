@@ -24,9 +24,18 @@ The Video Translation Service uses the following Azure resources, all deployed v
 | **Key Vault** | Secrets management (RBAC enabled) | Standard |
 | **Speech Services** | Video Translation API (with custom subdomain) | S0 (Standard) |
 | **AI Services** | Cognitive Services for translation | S0 (Standard) |
-| **Static Web App** | Blazor WebAssembly UI hosting | Free |
+| **Static Web App** | Blazor WebAssembly UI hosting | Standard (with IP restriction) |
 | **App Service Plan** | Hosting plan for Function App | S1 (Standard) |
-| **Function App** | Durable Functions API backend | .NET 8 Isolated |
+| **Function App** | Durable Functions API backend (IP restricted) | .NET 8 Isolated |
+
+### Security Configuration
+
+| Resource | Security Feature | Configuration |
+|----------|-----------------|---------------|
+| **Static Web App** | IP Whitelist | `staticwebapp.config.json` → `networking.allowedIpRanges` |
+| **Function App** | IP Restriction Rules | Bicep `ipSecurityRestrictions` parameter |
+| **Storage Account** | Managed Identity Only | No public blob access |
+| **Key Vault** | RBAC + Soft Delete | No access policies |
 
 ### Architecture Diagram
 
