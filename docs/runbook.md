@@ -298,6 +298,42 @@ az role assignment list --assignee $(az ad signed-in-user show --query id -o tsv
 
 **Cause**: RBAC role assignment hasn't propagated yet.
 
+#### 3. Reviews Page Returns 404
+
+**Cause**: Route conflict between `/api/jobs/pending` and `/api/jobs/{jobId}`.
+
+**Solution**: The pending endpoint was moved to `/api/reviews/pending`. Ensure you're using the latest deployed version:
+```powershell
+# Verify the endpoint is available
+Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/reviews/pending" -Method GET
+```
+
+#### 4. Jobs Stuck in PendingApproval
+
+**Cause**: Orchestrator is waiting for human approval (WaitForExternalEvent).
+
+**Solution**: 
+- Approve/reject via the Reviews page in the UI
+- Or use the API directly:
+```powershell
+# Approve a job
+Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/jobs/{jobId}/approve" -Method POST -ContentType "application/json" -Body '{"reviewedBy":"Admin","comments":"Looks good"}'
+
+# Reject a job
+Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/jobs/{jobId}/reject" -Method POST -ContentType "application/json" -Body '{"reviewedBy":"Admin","reason":"Quality issues"}'
+```
+- Jobs will auto-reject after 3 days if no action is taken
+
+#### 5. AI Validation Fails
+
+**Cause**: GPT-4o-mini deployment not configured or AI Foundry endpoint unavailable.
+
+**Solution**: Verify AI Foundry settings:
+```powershell
+# Check Function App settings
+az functionapp config appsettings list --name FuncApp-AMA-{N} --resource-group AMAFY26-deployment-{N} --query "[?starts_with(name, 'AIFoundry')]"
+```
+
 **Solution**: Wait 5-10 minutes for Azure RBAC propagation, or verify the role assignment:
 ```powershell
 az role assignment list --scope /subscriptions/<sub-id>/resourceGroups/AMAFY26-deployment-{N}/providers/Microsoft.KeyVault/vaults/KeyVault-AMA-{N}

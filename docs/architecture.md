@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph "Azure Static Web App"
-        BlazorUI[Blazor WebAssembly UI<br/>• Dashboard<br/>• Create Job<br/>• Job Details]
+        BlazorUI[Blazor WebAssembly UI<br/>• Dashboard<br/>• Create Job<br/>• Job Details<br/>• Reviews]
     end
 
     subgraph "Azure Function App"
@@ -60,6 +60,11 @@ graph TB
             A3[CreateIterationActivity]
             A4[GetIterationStatusActivity]
             A5[CopyOutputsActivity]
+            A6[RunValidationActivity]
+        end
+        
+        subgraph "Agents"
+            Agent[SubtitleValidationAgent]
         end
     end
 
@@ -67,7 +72,7 @@ graph TB
         Speech[Speech Services<br/>Video Translation API]
         Storage[Storage Account<br/>• videos/<br/>• outputs/<br/>• subtitles/]
         KV[Key Vault]
-        AI[AI Services]
+        AI[AI Services<br/>GPT-4o-mini]
     end
 
     subgraph "Monitoring"
@@ -83,6 +88,9 @@ graph TB
     Orch --> A3
     Orch --> A4
     Orch --> A5
+    Orch --> A6
+    A6 --> Agent
+    Agent --> AI
     
     A1 --> Storage
     A2 --> Speech
@@ -109,6 +117,7 @@ graph LR
         Home[Home.razor<br/>Dashboard]
         Create[Create.razor<br/>New Job Form]
         Details[JobDetails.razor<br/>Status & Downloads]
+        Reviews[Reviews.razor<br/>Pending Approvals]
     end
     
     subgraph "Services"
@@ -122,12 +131,16 @@ graph LR
     Home --> API
     Create --> API
     Details --> API
+    Reviews --> API
     API --> Models
 ```
 
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Dashboard** | `/` | View all translation jobs with status badges |
+| **Create Job** | `/create` | Form for video URL/blob, language selection, voice options |
+| **Job Details** | `/jobs/{jobId}` | View progress, download outputs, approve/reject, AI validation |
+| **Reviews** | `/reviews` | View and manage jobs pending human approval |
 | **Create Job** | `/create` | Form for video URL/blob, language selection, voice options |
 | **Job Details** | `/jobs/{jobId}` | View progress, download outputs, auto-refresh status |
 
@@ -148,6 +161,10 @@ graph LR
 | `/api/jobs` | GET | List all translation jobs |
 | `/api/jobs/{jobId}` | GET | Check job status and get output URLs |
 | `/api/jobs/{jobId}/iterate` | POST | Start a new iteration with edited WebVTT |
+| `/api/jobs/{jobId}/validate` | POST | Run AI validation on subtitles |
+| `/api/reviews/pending` | GET | List jobs pending human approval |
+| `/api/jobs/{jobId}/approve` | POST | Approve a translation job |
+| `/api/jobs/{jobId}/reject` | POST | Reject a translation job |
 
 **Technology**: Azure Functions HTTP triggers with Durable Client (.NET 8 Isolated)
 
@@ -157,7 +174,7 @@ graph LR
 
 **File**: `VideoTranslationOrchestrator.cs`
 
-**Pattern**: Polling-based state machine with 60-minute timeout
+**Pattern**: Polling-based state machine with 60-minute timeout and human approval gate
 
 ```mermaid
 stateDiagram-v2
@@ -177,10 +194,18 @@ stateDiagram-v2
     Processing --> Failed: API Failed
     Processing --> Failed: Timeout (60min)
     
-    CopyingOutputs --> Completed: Outputs Copied
+    CopyingOutputs --> RunningValidation: Outputs Copied
     CopyingOutputs --> Failed: Copy Error
     
-    Completed --> [*]
+    RunningValidation --> PendingApproval: AI Validation Complete
+    RunningValidation --> PendingApproval: Validation Skipped
+    
+    PendingApproval --> Approved: Human Approves
+    PendingApproval --> Rejected: Human Rejects
+    PendingApproval --> Rejected: Timeout (3 days)
+    
+    Approved --> [*]
+    Rejected --> [*]
     Failed --> [*]
 ```
 
@@ -189,6 +214,7 @@ stateDiagram-v2
 |---------|-------|
 | Polling Interval | 30 seconds |
 | Max Duration | 60 minutes |
+| Approval Timeout | 3 days |
 | Retry Attempts | 3 |
 | Retry Backoff | Exponential (5s base) |
 
@@ -204,11 +230,13 @@ graph LR
         CI[CreateIterationActivity]
         GS[GetIterationStatusActivity]
         CO[CopyOutputsActivity]
+        RV[RunValidationActivity]
     end
     
     subgraph "External Services"
         Speech[Speech API]
         Blob[Blob Storage]
+        GPT[GPT-4o-mini]
     end
     
     V --> Blob
@@ -216,6 +244,7 @@ graph LR
     CI --> Speech
     GS --> Speech
     CO --> Blob
+    RV --> GPT
 ```
 
 | Activity | File | Responsibility |
@@ -225,8 +254,28 @@ graph LR
 | `CreateIterationActivity` | `CreateIterationActivity.cs` | Create iteration via `PUT /translations/{id}/iterations/{id}` |
 | `GetIterationStatusActivity` | `GetIterationStatusActivity.cs` | Poll iteration status via `GET /translations/{id}/iterations/{id}` |
 | `CopyOutputsActivity` | `CopyOutputsActivity.cs` | Copy translated video/subtitles from Speech API URLs to your storage |
+| `RunValidationActivity` | `RunValidationActivity.cs` | Run AI-powered subtitle validation using GPT-4o-mini |
 
-### 5. Services (`src/api/Services/`)
+### 5. AI Agents (`src/api/Agents/`)
+
+**Purpose**: AI-powered agents for intelligent processing.
+
+| Agent | File | Responsibility |
+|-------|------|----------------|
+| `SubtitleValidationAgent` | `SubtitleValidationAgent.cs` | Analyzes subtitle quality using GPT-4o-mini |
+| `VttParsingService` | `VttParsingService.cs` | Parses WebVTT files for validation |
+| `AgentConfigurationService` | `AgentConfigurationService.cs` | Azure AI Foundry connection management |
+
+**Validation Categories**:
+| Category | Weight | Description |
+|----------|--------|-------------|
+| Translation Accuracy | 35% | Semantic accuracy of translation |
+| Grammar | 20% | Grammar and spelling in target language |
+| Timing | 20% | Subtitle synchronization |
+| Cultural Context | 15% | Idiom and cultural adaptation |
+| Formatting | 10% | Line length and readability |
+
+### 6. Services (`src/api/Services/`)
 
 **Purpose**: Shared services and API clients.
 
@@ -271,6 +320,10 @@ classDiagram
         CreatingIteration
         Processing
         CopyingOutputs
+        RunningValidation
+        PendingApproval
+        Approved
+        Rejected
         Completed
         Failed
     }
@@ -281,9 +334,25 @@ classDiagram
         +string TargetWebVttUrl
     }
     
+    class ApprovalDecision {
+        +bool Approved
+        +string ReviewedBy
+        +string Reason
+        +string Comments
+    }
+    
+    class SubtitleValidationResult {
+        +bool IsValid
+        +double ConfidenceScore
+        +List~ValidationIssue~ Issues
+        +ValidationCategoryScores CategoryScores
+    }
+    
     TranslationJob --> TranslationJobRequest
     TranslationJob --> JobStatus
     TranslationJob --> JobResult
+    TranslationJob --> ApprovalDecision
+    TranslationJob --> SubtitleValidationResult
 ```
 
 | Model | Location | Purpose |
@@ -292,6 +361,8 @@ classDiagram
 | `TranslationJob` | `Models/TranslationJob.cs` | Orchestrator state object |
 | `JobStatusResponse` | `Models/JobStatusResponse.cs` | API response DTO |
 | `IterateRequest` | `Models/IterateRequest.cs` | Request for new iteration |
+| `ApprovalDecision` | `Models/TranslationJob.cs` | Human approval/rejection decision |
+| `SubtitleValidationResult` | `Models/TranslationWorkflowState.cs` | AI validation result with scores |
 | Speech API Models | `Models/SpeechApi/*.cs` | Request/response types for Speech API |
 
 ---

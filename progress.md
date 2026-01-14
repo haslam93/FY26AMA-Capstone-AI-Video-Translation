@@ -82,6 +82,32 @@ Building a video translation service with:
 
 **Status**: Application Running ✅
 
+### Phase 11: Multi-Agent Architecture ✅ Complete
+
+**Goal**: Add AI-powered subtitle validation and human-in-the-loop approval
+
+**Tasks**:
+- [x] Phase 1: Foundation & Infrastructure (GPT-4o-mini deployment, Foundry Project)
+- [x] Phase 3: Subtitle Validation Agent (AI-powered quality scoring)
+- [x] Phase 4: Human-in-the-Loop (approval workflow with 3-day timeout)
+
+**New Features**:
+| Feature | Description |
+|---------|-------------|
+| AI Subtitle Validation | GPT-4o-mini analyzes translations for accuracy, grammar, timing |
+| Quality Scoring | 5-category scoring (Translation, Grammar, Timing, Cultural, Formatting) |
+| Human Approval Gate | Jobs wait for human approval after AI validation |
+| Reviews Dashboard | `/reviews` page to manage pending approvals |
+| Auto-Rejection | Jobs auto-rejected after 3 days without response |
+
+**New API Endpoints**:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs/{jobId}/validate` | POST | Run AI validation on subtitles |
+| `/api/reviews/pending` | GET | List jobs pending approval |
+| `/api/jobs/{jobId}/approve` | POST | Approve a translation |
+| `/api/jobs/{jobId}/reject` | POST | Reject a translation |
+
 ### Phase 10: Troubleshooting & Stability ✅ Complete
 
 **Goal**: Ensure stable operation of Azure resources
@@ -101,6 +127,18 @@ Building a video translation service with:
 | Storage Account | storageama3 | - |
 
 ### Completed Phases
+
+#### Phase 11: Multi-Agent Architecture ✅ Complete
+- [x] Deployed GPT-4o-mini model to AI Foundry
+- [x] Created SubtitleValidationAgent with GPT-4o-mini
+- [x] Added VTT parsing service for WebVTT files
+- [x] Created validation API endpoints
+- [x] Added AI Quality Validation section to UI
+- [x] Added RunValidationActivity for automatic validation
+- [x] Added WaitForExternalEvent approval gate (3-day timeout)
+- [x] Created Reviews.razor pending approvals page
+- [x] Added approve/reject buttons to JobDetails
+- [x] New job statuses: RunningValidation, PendingApproval, Approved, Rejected
 
 #### Phase 9: Subtitle Enhancements ✅ Complete
 - [x] Fixed UI property names for subtitle URLs
