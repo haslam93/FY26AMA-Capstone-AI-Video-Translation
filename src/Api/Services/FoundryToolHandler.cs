@@ -149,27 +149,102 @@ public class FoundryToolHandler
     }
 
     /// <summary>
-    /// Fetches subtitle content from a URL (with or without SAS token).
+    /// Fetches subtitle content from a URL.
+    /// For our blob storage URLs, uses the BlobStorageService with managed identity.
+    /// For external URLs with SAS tokens, uses HTTP GET.
     /// </summary>
     private async Task<string> FetchSubtitleContentAsync(string url)
     {
+        // Check if this is a URL from our blob storage (without SAS token)
+        // Our stored URLs look like: https://storageama3.blob.core.windows.net/outputs/job-id/file.vtt
+        if (TryParseBlobUrl(url, out var containerName, out var blobPath))
+        {
+            _logger.LogInformation("Fetching subtitle from blob storage: {Container}/{BlobPath}", 
+                containerName, blobPath);
+            
+            try
+            {
+                var content = await _blobStorageService.ReadAsStringAsync(containerName, blobPath);
+                return TruncateIfNeeded(content);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read blob directly, falling back to HTTP GET");
+                // Fall through to HTTP method
+            }
+        }
+
+        // For external URLs (with SAS tokens) or fallback, use HTTP GET
+        _logger.LogInformation("Fetching subtitle via HTTP GET: {Url}", 
+            url.Length > 100 ? url.Substring(0, 100) + "..." : url);
+        
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(30);
         
         var response = await httpClient.GetAsync(url);
         response.EnsureSuccessStatusCode();
         
-        var content = await response.Content.ReadAsStringAsync();
-        
-        // Truncate if too long to avoid token limits
+        var content2 = await response.Content.ReadAsStringAsync();
+        return TruncateIfNeeded(content2);
+    }
+
+    /// <summary>
+    /// Tries to parse a blob storage URL into container and blob path.
+    /// Returns true if successful (URL is from our blob storage without SAS).
+    /// </summary>
+    private bool TryParseBlobUrl(string url, out string containerName, out string blobPath)
+    {
+        containerName = string.Empty;
+        blobPath = string.Empty;
+
+        try
+        {
+            var uri = new Uri(url);
+            
+            // Check if it's a blob storage URL (*.blob.core.windows.net)
+            if (!uri.Host.EndsWith(".blob.core.windows.net"))
+            {
+                return false;
+            }
+
+            // If it has a query string (SAS token), use HTTP instead
+            if (!string.IsNullOrEmpty(uri.Query))
+            {
+                _logger.LogDebug("URL has query string, using HTTP GET");
+                return false;
+            }
+
+            // Parse path: /container/blob/path
+            var pathParts = uri.AbsolutePath.TrimStart('/').Split('/', 2);
+            if (pathParts.Length < 2)
+            {
+                return false;
+            }
+
+            containerName = pathParts[0];
+            blobPath = pathParts[1];
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to parse URL as blob storage URL");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Truncates content if too long to avoid token limits.
+    /// </summary>
+    private string TruncateIfNeeded(string content)
+    {
         const int maxLength = 50000; // ~12k tokens
         if (content.Length > maxLength)
         {
             _logger.LogWarning("Subtitle content truncated from {Original} to {Max} characters", 
                 content.Length, maxLength);
-            content = content.Substring(0, maxLength) + "\n\n[Content truncated due to length...]";
+            return content.Substring(0, maxLength) + "\n\n[Content truncated due to length...]";
         }
-
         return content;
     }
 }

@@ -309,6 +309,76 @@
                             }
                         </div>
                     </div>
+
+                    @* AI Chat Panel - Interactive conversation with validation agent *@
+                    @if (!string.IsNullOrEmpty(job.ValidationThreadId))
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-chat-dots"></i> Ask the AI Agent
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                @* Chat History *@
+                                <div class="chat-history border rounded p-3 mb-3" style="max-height: 300px; overflow-y: auto;" @ref="chatHistoryElement">
+                                    @if (loadingChatHistory)
+                                    {
+                                        <div class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (chatMessages.Count == 0)
+                                    {
+                                        <p class="text-muted text-center mb-0">
+                                            <i class="bi bi-chat-left-text"></i> Ask questions about the translation quality
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var msg in chatMessages)
+                                        {
+                                            <div class="mb-2 @(msg.Role == "user" ? "text-end" : "")">
+                                                <div class="d-inline-block p-2 rounded @(msg.Role == "user" ? "bg-primary text-white" : "bg-light")" 
+                                                     style="max-width: 80%;">
+                                                    <small class="d-block text-@(msg.Role == "user" ? "white-50" : "muted") mb-1">
+                                                        @(msg.Role == "user" ? "You" : "AI Agent")
+                                                    </small>
+                                                    <div style="white-space: pre-wrap;">@msg.Content</div>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                                
+                                @* Chat Input *@
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Ask about the translation..."
+                                           @bind="chatMessage" @bind:event="oninput"
+                                           @onkeypress="HandleChatKeyPress"
+                                           disabled="@sendingChat" />
+                                    <button class="btn btn-primary" @onclick="SendChatMessage" disabled="@(sendingChat || string.IsNullOrWhiteSpace(chatMessage))">
+                                        @if (sendingChat)
+                                        {
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send"></i>
+                                        }
+                                    </button>
+                                </div>
+                                @if (!string.IsNullOrEmpty(chatError))
+                                {
+                                    <div class="alert alert-danger mt-2 mb-0 py-1 px-2 small">
+                                        @chatError
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 }
             </div>
 
@@ -472,6 +542,14 @@
     private bool validating = false;
     private string? validationError;
 
+    // Chat state
+    private List<ConversationMessage> chatMessages = new();
+    private string chatMessage = string.Empty;
+    private bool sendingChat = false;
+    private bool loadingChatHistory = false;
+    private string? chatError;
+    private ElementReference chatHistoryElement;
+
     // Use validation result from API if available, otherwise use locally fetched one
     private SubtitleValidationResult? CurrentValidationResult => job?.ValidationResult ?? validationResult;
 
@@ -485,6 +563,12 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadJob();
+        
+        // Load chat history if validation thread exists
+        if (!string.IsNullOrEmpty(job?.ValidationThreadId))
+        {
+            await LoadChatHistory();
+        }
         
         // Auto-start refresh if processing
         if (IsProcessing)
@@ -688,6 +772,88 @@
         {
             isApproving = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task LoadChatHistory()
+    {
+        if (string.IsNullOrEmpty(job?.ValidationThreadId)) return;
+
+        loadingChatHistory = true;
+        chatError = null;
+
+        try
+        {
+            var history = await ApiService.GetChatHistoryAsync(JobId);
+            if (history?.Messages != null)
+            {
+                chatMessages = history.Messages;
+            }
+        }
+        catch (Exception ex)
+        {
+            chatError = $"Failed to load chat history: {ex.Message}";
+        }
+        finally
+        {
+            loadingChatHistory = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage)) return;
+
+        sendingChat = true;
+        chatError = null;
+        var messageToSend = chatMessage;
+        chatMessage = string.Empty;
+
+        // Add user message immediately for responsiveness
+        chatMessages.Add(new ConversationMessage
+        {
+            Role = "user",
+            Content = messageToSend,
+            Timestamp = DateTime.UtcNow
+        });
+        StateHasChanged();
+
+        try
+        {
+            var response = await ApiService.SendChatMessageAsync(JobId, messageToSend);
+            if (response != null && !string.IsNullOrEmpty(response.Message))
+            {
+                chatMessages.Add(new ConversationMessage
+                {
+                    Role = "assistant",
+                    Content = response.Message,
+                    Timestamp = response.Timestamp
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            chatError = $"Failed to send message: {ex.Message}";
+            // Remove the user message if sending failed
+            if (chatMessages.Count > 0 && chatMessages[^1].Role == "user")
+            {
+                chatMessages.RemoveAt(chatMessages.Count - 1);
+            }
+            chatMessage = messageToSend; // Restore the message
+        }
+        finally
+        {
+            sendingChat = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleChatKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !sendingChat && !string.IsNullOrWhiteSpace(chatMessage))
+        {
+            await SendChatMessage();
         }
     }
 

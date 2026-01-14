@@ -18,14 +18,17 @@ public class TranslationFunctions
 {
     private readonly ILogger<TranslationFunctions> _logger;
     private readonly IBlobStorageService _blobService;
+    private readonly IFoundryAgentService? _foundryAgentService;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public TranslationFunctions(
         ILogger<TranslationFunctions> logger,
-        IBlobStorageService blobService)
+        IBlobStorageService blobService,
+        IFoundryAgentService? foundryAgentService = null)
     {
         _logger = logger;
         _blobService = blobService;
+        _foundryAgentService = foundryAgentService;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -708,6 +711,170 @@ public class TranslationFunctions
         }
     }
 
+    /// <summary>
+    /// POST /api/jobs/{jobId}/chat - Send a message to the validation agent for a job.
+    /// </summary>
+    [Function("ChatWithAgent")]
+    public async Task<HttpResponseData> ChatWithAgentAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "jobs/{jobId}/chat")] HttpRequestData req,
+        [DurableClient] DurableTaskClient durableClient,
+        string jobId)
+    {
+        _logger.LogInformation("ChatWithAgent: Received message for job {JobId}", jobId);
+
+        try
+        {
+            // Check if Foundry Agent Service is available
+            if (_foundryAgentService == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.ServiceUnavailable, 
+                    "Chat functionality is not available - Foundry Agent Service not configured");
+            }
+
+            // Get the job to retrieve thread ID - MUST use getInputsAndOutputs to get SerializedCustomStatus
+            var instance = await durableClient.GetInstanceAsync(jobId, getInputsAndOutputs: true);
+            if (instance == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.NotFound, $"Job {jobId} not found");
+            }
+
+            // Parse custom status to get job state
+            TranslationJob? job = null;
+            if (!string.IsNullOrEmpty(instance.SerializedCustomStatus))
+            {
+                try
+                {
+                    job = JsonSerializer.Deserialize<TranslationJob>(instance.SerializedCustomStatus, _jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "ChatWithAgent: Failed to parse custom status for job {JobId}", jobId);
+                }
+            }
+
+            if (job == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Job {jobId} state not available - validation may not have been run yet");
+            }
+
+            // Check for thread ID
+            if (string.IsNullOrEmpty(job.ValidationThreadId))
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Job {jobId} does not have a validation thread - validation may not have been run yet");
+            }
+
+            // Parse the message from request body
+            var body = await req.ReadAsStringAsync();
+            var chatRequest = string.IsNullOrEmpty(body) ? null : 
+                JsonSerializer.Deserialize<ChatRequest>(body, _jsonOptions);
+
+            if (chatRequest == null || string.IsNullOrWhiteSpace(chatRequest.Message))
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Message is required");
+            }
+
+            // Send message to agent
+            var agentResponse = await _foundryAgentService.SendFollowUpMessageAsync(
+                job.ValidationThreadId,
+                chatRequest.Message,
+                job);
+
+            _logger.LogInformation("ChatWithAgent: Agent responded for job {JobId}", jobId);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse
+            {
+                Message = agentResponse,
+                Timestamp = DateTime.UtcNow
+            }, _jsonOptions));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ChatWithAgent: Error processing chat for job {JobId}", jobId);
+            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GET /api/jobs/{jobId}/chat/history - Get conversation history for a job's validation thread.
+    /// </summary>
+    [Function("GetChatHistory")]
+    public async Task<HttpResponseData> GetChatHistoryAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "jobs/{jobId}/chat/history")] HttpRequestData req,
+        [DurableClient] DurableTaskClient durableClient,
+        string jobId)
+    {
+        _logger.LogInformation("GetChatHistory: Getting history for job {JobId}", jobId);
+
+        try
+        {
+            // Check if Foundry Agent Service is available
+            if (_foundryAgentService == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.ServiceUnavailable, 
+                    "Chat functionality is not available - Foundry Agent Service not configured");
+            }
+
+            // Get the job to retrieve thread ID - MUST use getInputsAndOutputs to get SerializedCustomStatus
+            var instance = await durableClient.GetInstanceAsync(jobId, getInputsAndOutputs: true);
+            if (instance == null)
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.NotFound, $"Job {jobId} not found");
+            }
+
+            // Parse custom status to get job state
+            TranslationJob? job = null;
+            if (!string.IsNullOrEmpty(instance.SerializedCustomStatus))
+            {
+                try
+                {
+                    job = JsonSerializer.Deserialize<TranslationJob>(instance.SerializedCustomStatus, _jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "GetChatHistory: Failed to parse custom status for job {JobId}", jobId);
+                }
+            }
+
+            if (job == null || string.IsNullOrEmpty(job.ValidationThreadId))
+            {
+                // Return empty history if no thread exists
+                var emptyResponse = req.CreateResponse(HttpStatusCode.OK);
+                emptyResponse.Headers.Add("Content-Type", "application/json");
+                await emptyResponse.WriteStringAsync(JsonSerializer.Serialize(new ChatHistoryResponse
+                {
+                    Messages = new List<ConversationMessage>(),
+                    ThreadId = null
+                }, _jsonOptions));
+                return emptyResponse;
+            }
+
+            // Get conversation history
+            var messages = await _foundryAgentService.GetConversationHistoryAsync(job.ValidationThreadId);
+
+            _logger.LogInformation("GetChatHistory: Retrieved {Count} messages for job {JobId}", 
+                messages.Count, jobId);
+
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new ChatHistoryResponse
+            {
+                Messages = messages.ToList(),
+                ThreadId = job.ValidationThreadId
+            }, _jsonOptions));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetChatHistory: Error getting chat history for job {JobId}", jobId);
+            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
     private static JobStatus MapOrchestrationStatus(OrchestrationRuntimeStatus status)
     {
         return status switch
@@ -756,4 +923,30 @@ public class RejectionRequest
     public string? ReviewedBy { get; set; }
     public string? Reason { get; set; }
     public string? Comments { get; set; }
+}
+
+/// <summary>
+/// Request model for chat messages.
+/// </summary>
+public class ChatRequest
+{
+    public string? Message { get; set; }
+}
+
+/// <summary>
+/// Response model for chat messages.
+/// </summary>
+public class ChatResponse
+{
+    public string? Message { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
+/// <summary>
+/// Response model for chat history.
+/// </summary>
+public class ChatHistoryResponse
+{
+    public List<ConversationMessage> Messages { get; set; } = new();
+    public string? ThreadId { get; set; }
 }

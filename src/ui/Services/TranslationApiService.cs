@@ -17,6 +17,8 @@ public interface ITranslationApiService
     Task<ApproveRejectResponse?> RejectJobAsync(string jobId, string? reviewedBy = null, string? reason = null, string? comments = null);
     Task<UploadResponse?> UploadVideoAsync(Stream fileStream, string fileName, IProgress<int>? progress = null);
     Task<ValidationResponse?> ValidateSubtitlesAsync(string jobId);
+    Task<ChatResponse?> SendChatMessageAsync(string jobId, string message);
+    Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId);
 }
 
 /// <summary>
@@ -84,6 +86,19 @@ public class TranslationApiService : ITranslationApiService
         var response = await _httpClient.PostAsync($"api/jobs/{jobId}/validate", null);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ValidationResponse>();
+    }
+
+    public async Task<ChatResponse?> SendChatMessageAsync(string jobId, string message)
+    {
+        var request = new ChatRequest { Message = message };
+        var response = await _httpClient.PostAsJsonAsync($"api/jobs/{jobId}/chat", request);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ChatResponse>();
+    }
+
+    public async Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId)
+    {
+        return await _httpClient.GetFromJsonAsync<ChatHistoryResponse>($"api/jobs/{jobId}/chat/history");
     }
 
     private static string GetContentType(string fileName)

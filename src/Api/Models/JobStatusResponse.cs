@@ -40,6 +40,9 @@ public class JobStatusResponse
     [JsonPropertyName("validationResult")]
     public SubtitleValidationResult? ValidationResult { get; set; }
 
+    [JsonPropertyName("validationThreadId")]
+    public string? ValidationThreadId { get; set; }
+
     [JsonPropertyName("error")]
     public string? Error { get; set; }
 
@@ -61,6 +64,7 @@ public class JobStatusResponse
             LastUpdatedAt = job.LastUpdatedAt,
             Result = job.Result,
             ValidationResult = job.ValidationResult,
+            ValidationThreadId = job.ValidationThreadId,
             Error = job.Error
         };
     }

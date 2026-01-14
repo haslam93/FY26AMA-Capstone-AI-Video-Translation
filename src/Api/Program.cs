@@ -69,10 +69,15 @@ builder.Services.AddHttpClient<IVttParsingService, VttParsingService>();
 builder.Services.AddScoped<ISubtitleValidationAgent, SubtitleValidationAgent>();
 
 // Configure Foundry Agent Service Options
+// Environment variables use colons for nested config (e.g., AIFoundry:ProjectEndpoint)
 builder.Services.Configure<FoundryAgentOptions>(options =>
 {
-    options.ProjectEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
-    options.ModelDeploymentName = Environment.GetEnvironmentVariable("FOUNDRY_MODEL_DEPLOYMENT") ?? "gpt-4o-mini";
+    // Try colon-separated format first (Azure config style), then underscore format
+    options.ProjectEndpoint = Environment.GetEnvironmentVariable("AIFoundry:ProjectEndpoint") 
+        ?? Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
+    options.ModelDeploymentName = Environment.GetEnvironmentVariable("AIFoundry:ModelDeploymentName") 
+        ?? Environment.GetEnvironmentVariable("FOUNDRY_MODEL_DEPLOYMENT") 
+        ?? "gpt-4o-mini";
     options.AgentName = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_NAME") ?? "SubtitleValidationAgent";
 });
 
@@ -81,7 +86,8 @@ builder.Services.AddScoped<FoundryToolHandler>();
 
 // Register Foundry Agent Service (uses Azure AI Foundry Persistent Agents SDK)
 // Only register if the endpoint is configured
-var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
+var foundryEndpoint = Environment.GetEnvironmentVariable("AIFoundry:ProjectEndpoint") 
+    ?? Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
 if (!string.IsNullOrEmpty(foundryEndpoint))
 {
     builder.Services.AddScoped<IFoundryAgentService, FoundryAgentService>();

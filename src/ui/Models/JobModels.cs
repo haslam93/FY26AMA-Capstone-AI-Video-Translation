@@ -54,6 +54,7 @@ public class JobStatusResponse
     public DateTime LastUpdatedAt { get; set; }
     public JobResultDto? Result { get; set; }
     public SubtitleValidationResult? ValidationResult { get; set; }
+    public string? ValidationThreadId { get; set; }
     public string? Error { get; set; }
 }
 
@@ -216,4 +217,40 @@ public class ApprovalDecision
     public string? ReviewedBy { get; set; }
     public string? Reason { get; set; }
     public string? Comments { get; set; }
+}
+
+/// <summary>
+/// Request to send a chat message to the validation agent.
+/// </summary>
+public class ChatRequest
+{
+    public string? Message { get; set; }
+}
+
+/// <summary>
+/// Response from the validation agent chat.
+/// </summary>
+public class ChatResponse
+{
+    public string? Message { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
+/// <summary>
+/// Conversation history response.
+/// </summary>
+public class ChatHistoryResponse
+{
+    public List<ConversationMessage> Messages { get; set; } = new();
+    public string? ThreadId { get; set; }
+}
+
+/// <summary>
+/// A message in the conversation.
+/// </summary>
+public class ConversationMessage
+{
+    public string Role { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
 }

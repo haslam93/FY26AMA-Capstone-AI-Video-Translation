@@ -93,6 +93,13 @@ public class TranslationJob
     public SubtitleValidationResult? ValidationResult { get; set; }
 
     /// <summary>
+    /// Thread ID for the Foundry Agent conversation.
+    /// Used for follow-up chat interactions with the validation agent.
+    /// </summary>
+    [JsonPropertyName("validationThreadId")]
+    public string? ValidationThreadId { get; set; }
+
+    /// <summary>
     /// Human approval decision.
     /// </summary>
     [JsonPropertyName("approvalDecision")]
