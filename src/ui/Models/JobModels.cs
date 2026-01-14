@@ -53,6 +53,7 @@ public class JobStatusResponse
     public DateTime CreatedAt { get; set; }
     public DateTime LastUpdatedAt { get; set; }
     public JobResultDto? Result { get; set; }
+    public SubtitleValidationResult? ValidationResult { get; set; }
     public string? Error { get; set; }
 }
 

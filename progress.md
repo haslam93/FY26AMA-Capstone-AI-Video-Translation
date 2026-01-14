@@ -128,6 +128,16 @@ Building a video translation service with:
 
 ### Completed Phases
 
+#### Phase 12: UI & Orchestrator State Fixes ✅ Complete (2026-01-14)
+- [x] Fixed Storage Blob Delegator role for SAS token generation (403 errors)
+- [x] Fixed orchestrator approval timeout using CancellationTokenSource
+- [x] Added `context.SetCustomStatus(job)` to expose job state during approval wait
+- [x] Updated GetJobStatus to read from SerializedCustomStatus for pending approvals
+- [x] Added ValidationResult property to API and UI JobStatusResponse
+- [x] Updated JobDetails.razor to show validation results for PendingApproval status
+- [x] Added CurrentValidationResult computed property for UI state management
+- [x] Terminated stuck running orchestration instances
+
 #### Phase 11: Multi-Agent Architecture ✅ Complete
 - [x] Deployed GPT-4o-mini model to AI Foundry
 - [x] Created SubtitleValidationAgent with GPT-4o-mini
@@ -261,6 +271,11 @@ Building a video translation service with:
 | 2026-01-12 | Fix | Fixed Error type mismatch in JobStatusResponse | ✅ Done |
 | 2026-01-12 | Fix | Removed invalid "auto" source locale | ✅ Done |
 | 2026-01-12 | Enhancement | Added 120+ source and 60+ target languages | ✅ Done |
+| 2026-01-14 | Fix | Added Storage Blob Delegator role (SAS token 403 fix) | ✅ Done |
+| 2026-01-14 | Fix | Fixed orchestrator approval timeout with CancellationTokenSource | ✅ Done |
+| 2026-01-14 | Fix | Added SetCustomStatus for UI to see PendingApproval state | ✅ Done |
+| 2026-01-14 | Fix | Updated UI to show validation results during approval | ✅ Done |
+| 2026-01-14 | Cleanup | Terminated stuck orchestration instances | ✅ Done |
 
 ---
 

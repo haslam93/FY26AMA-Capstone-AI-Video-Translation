@@ -37,6 +37,9 @@ public class JobStatusResponse
     [JsonPropertyName("result")]
     public TranslationResult? Result { get; set; }
 
+    [JsonPropertyName("validationResult")]
+    public SubtitleValidationResult? ValidationResult { get; set; }
+
     [JsonPropertyName("error")]
     public string? Error { get; set; }
 
@@ -57,6 +60,7 @@ public class JobStatusResponse
             CreatedAt = job.CreatedAt,
             LastUpdatedAt = job.LastUpdatedAt,
             Result = job.Result,
+            ValidationResult = job.ValidationResult,
             Error = job.Error
         };
     }

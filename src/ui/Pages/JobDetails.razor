@@ -93,7 +93,7 @@
                     </div>
                 }
 
-                @if (job.Result != null && job.Status == "Completed")
+                @if (job.Result != null && (job.Status == "Completed" || job.Status == "PendingApproval" || job.Status == "Approved" || job.Status == "Rejected"))
                 {
                     <div class="card border-success mb-4">
                         <div class="card-header bg-success text-white">
@@ -142,15 +142,15 @@
                     </div>
 
                     @* AI Quality Validation Section *@
-                    <div class="card mb-4 @(validationResult != null ? (validationResult.IsValid ? "border-success" : "border-warning") : "")">
+                    <div class="card mb-4 @(CurrentValidationResult != null ? (CurrentValidationResult.IsValid ? "border-success" : "border-warning") : "")">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
                                 <i class="bi bi-robot"></i> AI Quality Validation
                             </h5>
-                            @if (validationResult != null)
+                            @if (CurrentValidationResult != null)
                             {
-                                <span class="badge @(validationResult.IsValid ? "bg-success" : "bg-warning") fs-6">
-                                    @(validationResult.ConfidenceScore.ToString("P0"))
+                                <span class="badge @(CurrentValidationResult.IsValid ? "bg-success" : "bg-warning") fs-6">
+                                    @(CurrentValidationResult.ConfidenceScore.ToString("P0"))
                                 </span>
                             }
                         </div>
@@ -170,21 +170,21 @@
                                     <i class="bi bi-exclamation-triangle"></i> @validationError
                                 </div>
                             }
-                            else if (validationResult != null)
+                            else if (CurrentValidationResult != null)
                             {
                                 @* Overall Score *@
                                 <div class="mb-4">
                                     <div class="d-flex justify-content-between mb-1">
                                         <span>Overall Quality Score</span>
-                                        <strong class="@(validationResult.ConfidenceScore >= 0.8 ? "text-success" : validationResult.ConfidenceScore >= 0.6 ? "text-warning" : "text-danger")">
-                                            @(validationResult.ConfidenceScore.ToString("P0"))
+                                        <strong class="@(CurrentValidationResult.ConfidenceScore >= 0.8 ? "text-success" : CurrentValidationResult.ConfidenceScore >= 0.6 ? "text-warning" : "text-danger")">
+                                            @(CurrentValidationResult.ConfidenceScore.ToString("P0"))
                                         </strong>
                                     </div>
                                     <div class="progress" style="height: 10px;">
-                                        <div class="progress-bar @(validationResult.ConfidenceScore >= 0.8 ? "bg-success" : validationResult.ConfidenceScore >= 0.6 ? "bg-warning" : "bg-danger")"
+                                        <div class="progress-bar @(CurrentValidationResult.ConfidenceScore >= 0.8 ? "bg-success" : CurrentValidationResult.ConfidenceScore >= 0.6 ? "bg-warning" : "bg-danger")"
                                              role="progressbar" 
-                                             style="width: @(validationResult.ConfidenceScore * 100)%"
-                                             aria-valuenow="@(validationResult.ConfidenceScore * 100)" 
+                                             style="width: @(CurrentValidationResult.ConfidenceScore * 100)%"
+                                             aria-valuenow="@(CurrentValidationResult.ConfidenceScore * 100)" 
                                              aria-valuemin="0" 
                                              aria-valuemax="100">
                                         </div>
@@ -192,7 +192,7 @@
                                 </div>
 
                                 @* Category Scores *@
-                                @if (validationResult.CategoryScores != null)
+                                @if (CurrentValidationResult.CategoryScores != null)
                                 {
                                     <h6 class="mb-3">Category Scores</h6>
                                     <div class="row row-cols-2 g-2 mb-3">
@@ -200,8 +200,8 @@
                                             <div class="card bg-light">
                                                 <div class="card-body p-2 text-center">
                                                     <div class="small text-muted">Translation</div>
-                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.TranslationAccuracyScore)">
-                                                        @(validationResult.CategoryScores.TranslationAccuracyScore.ToString("P0"))
+                                                    <strong class="@GetScoreClass(CurrentValidationResult.CategoryScores.TranslationAccuracyScore)">
+                                                        @(CurrentValidationResult.CategoryScores.TranslationAccuracyScore.ToString("P0"))
                                                     </strong>
                                                 </div>
                                             </div>
@@ -210,8 +210,8 @@
                                             <div class="card bg-light">
                                                 <div class="card-body p-2 text-center">
                                                     <div class="small text-muted">Grammar</div>
-                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.GrammarScore)">
-                                                        @(validationResult.CategoryScores.GrammarScore.ToString("P0"))
+                                                    <strong class="@GetScoreClass(CurrentValidationResult.CategoryScores.GrammarScore)">
+                                                        @(CurrentValidationResult.CategoryScores.GrammarScore.ToString("P0"))
                                                     </strong>
                                                 </div>
                                             </div>
@@ -220,8 +220,8 @@
                                             <div class="card bg-light">
                                                 <div class="card-body p-2 text-center">
                                                     <div class="small text-muted">Timing</div>
-                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.TimingScore)">
-                                                        @(validationResult.CategoryScores.TimingScore.ToString("P0"))
+                                                    <strong class="@GetScoreClass(CurrentValidationResult.CategoryScores.TimingScore)">
+                                                        @(CurrentValidationResult.CategoryScores.TimingScore.ToString("P0"))
                                                     </strong>
                                                 </div>
                                             </div>
@@ -230,8 +230,8 @@
                                             <div class="card bg-light">
                                                 <div class="card-body p-2 text-center">
                                                     <div class="small text-muted">Cultural</div>
-                                                    <strong class="@GetScoreClass(validationResult.CategoryScores.CulturalContextScore)">
-                                                        @(validationResult.CategoryScores.CulturalContextScore.ToString("P0"))
+                                                    <strong class="@GetScoreClass(CurrentValidationResult.CategoryScores.CulturalContextScore)">
+                                                        @(CurrentValidationResult.CategoryScores.CulturalContextScore.ToString("P0"))
                                                     </strong>
                                                 </div>
                                             </div>
@@ -241,28 +241,28 @@
 
                                 @* Stats *@
                                 <div class="small text-muted mb-3">
-                                    <i class="bi bi-file-text"></i> @validationResult.SourceCueCount source cues → @validationResult.TargetCueCount target cues
+                                    <i class="bi bi-file-text"></i> @CurrentValidationResult.SourceCueCount source cues → @CurrentValidationResult.TargetCueCount target cues
                                     <br/>
-                                    <i class="bi bi-chat-text"></i> @validationResult.SourceWordCount source words → @validationResult.TargetWordCount target words
+                                    <i class="bi bi-chat-text"></i> @CurrentValidationResult.SourceWordCount source words → @CurrentValidationResult.TargetWordCount target words
                                 </div>
 
                                 @* AI Reasoning *@
-                                @if (!string.IsNullOrWhiteSpace(validationResult.Reasoning))
+                                @if (!string.IsNullOrWhiteSpace(CurrentValidationResult.Reasoning))
                                 {
                                     <div class="alert alert-info mb-3">
                                         <strong><i class="bi bi-lightbulb"></i> AI Analysis:</strong>
-                                        <p class="mb-0 mt-1 small">@validationResult.Reasoning</p>
+                                        <p class="mb-0 mt-1 small">@CurrentValidationResult.Reasoning</p>
                                     </div>
                                 }
 
                                 @* Issues *@
-                                @if (validationResult.Issues.Any())
+                                @if (CurrentValidationResult.Issues.Any())
                                 {
-                                    <h6 class="mb-2">Issues Found (@validationResult.Issues.Count)</h6>
+                                    <h6 class="mb-2">Issues Found (@CurrentValidationResult.Issues.Count)</h6>
                                     <div class="accordion" id="issuesAccordion">
-                                        @for (int i = 0; i < Math.Min(validationResult.Issues.Count, 5); i++)
+                                        @for (int i = 0; i < Math.Min(CurrentValidationResult.Issues.Count, 5); i++)
                                         {
-                                            var issue = validationResult.Issues[i];
+                                            var issue = CurrentValidationResult.Issues[i];
                                             var collapseId = $"issue-{i}";
                                             <div class="accordion-item">
                                                 <h2 class="accordion-header">
@@ -288,9 +288,9 @@
                                             </div>
                                         }
                                     </div>
-                                    @if (validationResult.Issues.Count > 5)
+                                    @if (CurrentValidationResult.Issues.Count > 5)
                                     {
-                                        <p class="text-muted small mt-2">And @(validationResult.Issues.Count - 5) more issues...</p>
+                                        <p class="text-muted small mt-2">And @(CurrentValidationResult.Issues.Count - 5) more issues...</p>
                                     }
                                 }
                                 else
@@ -471,6 +471,9 @@
     private SubtitleValidationResult? validationResult;
     private bool validating = false;
     private string? validationError;
+
+    // Use validation result from API if available, otherwise use locally fetched one
+    private SubtitleValidationResult? CurrentValidationResult => job?.ValidationResult ?? validationResult;
 
     private bool IsProcessing => job?.Status != null && 
         !job.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) &&

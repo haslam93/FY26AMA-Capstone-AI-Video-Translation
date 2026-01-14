@@ -136,13 +136,13 @@ public class TranslationFunctions
                 return await CreateErrorResponse(req, HttpStatusCode.NotFound, $"Job {jobId} not found");
             }
 
-            _logger.LogInformation("GetJobStatus: Instance {JobId} - RuntimeStatus={RuntimeStatus}, HasOutput={HasOutput}, HasInput={HasInput}", 
-                jobId, instance.RuntimeStatus, instance.SerializedOutput != null, instance.SerializedInput != null);
+            _logger.LogInformation("GetJobStatus: Instance {JobId} - RuntimeStatus={RuntimeStatus}, HasOutput={HasOutput}, HasInput={HasInput}, HasCustomStatus={HasCustomStatus}", 
+                jobId, instance.RuntimeStatus, instance.SerializedOutput != null, instance.SerializedInput != null, instance.SerializedCustomStatus != null);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json");
 
-            // Try to get the job state from the orchestration output
+            // Try to get the job state from the orchestration output (completed orchestrations)
             if (instance.SerializedOutput != null)
             {
                 _logger.LogDebug("GetJobStatus: SerializedOutput = {Output}", instance.SerializedOutput);
@@ -160,6 +160,27 @@ public class TranslationFunctions
                 catch (JsonException ex)
                 {
                     _logger.LogError(ex, "GetJobStatus: Failed to deserialize output: {Output}", instance.SerializedOutput);
+                }
+            }
+
+            // Try custom status (set by orchestrator during long waits like approval)
+            if (instance.SerializedCustomStatus != null)
+            {
+                _logger.LogDebug("GetJobStatus: SerializedCustomStatus = {CustomStatus}", instance.SerializedCustomStatus);
+                try
+                {
+                    var job = JsonSerializer.Deserialize<TranslationJob>(instance.SerializedCustomStatus, _jsonOptions);
+                    if (job != null)
+                    {
+                        var statusResponse = JobStatusResponse.FromJob(job);
+                        await response.WriteStringAsync(JsonSerializer.Serialize(statusResponse, _jsonOptions));
+                        return response;
+                    }
+                    _logger.LogWarning("GetJobStatus: Deserialized custom status was null");
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "GetJobStatus: Failed to deserialize custom status: {CustomStatus}", instance.SerializedCustomStatus);
                 }
             }
 

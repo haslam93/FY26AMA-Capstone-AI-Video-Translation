@@ -325,15 +325,20 @@ public static class VideoTranslationOrchestrator
             job.ApprovalRequestedAt = context.CurrentUtcDateTime;
             job.LastUpdatedAt = context.CurrentUtcDateTime;
 
+            // IMPORTANT: Set custom status so the UI can read the current state while waiting for approval
+            // Without this, GetJobStatus only sees the initial input since output is null until orchestration completes
+            context.SetCustomStatus(job);
+
             logger.LogInformation("Job {JobId}: Waiting for human approval (timeout: {Timeout})", job.JobId, ApprovalTimeout);
 
-            // Wait for external event with timeout
+            // Wait for external event with timeout - use CancellationTokenSource to properly cancel timer
+            using var timeoutCts = new CancellationTokenSource();
             var approvalTask = context.WaitForExternalEvent<ApprovalDecision>("ApprovalDecision");
-            var timeoutTask = context.CreateTimer(context.CurrentUtcDateTime.Add(ApprovalTimeout), CancellationToken.None);
+            var timeoutTask = context.CreateTimer(context.CurrentUtcDateTime.Add(ApprovalTimeout), timeoutCts.Token);
 
             var winner = await Task.WhenAny(approvalTask, timeoutTask);
 
-            if (winner == timeoutTask)
+            if (winner == timeoutTask && !timeoutCts.IsCancellationRequested)
             {
                 // Auto-reject after timeout
                 logger.LogWarning("Job {JobId}: Approval timed out after {Days} days", job.JobId, ApprovalTimeout.TotalDays);
@@ -348,7 +353,9 @@ public static class VideoTranslationOrchestrator
             }
             else
             {
-                // Human decision received
+                // Human decision received - cancel the timeout timer
+                timeoutCts.Cancel();
+                
                 var decision = await approvalTask;
                 job.ApprovalDecision = decision;
                 job.ApprovalDecisionAt = context.CurrentUtcDateTime;
