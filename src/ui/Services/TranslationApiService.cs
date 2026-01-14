@@ -50,7 +50,7 @@ public class TranslationApiService : ITranslationApiService
 
     public async Task<PendingApprovalsResponse?> GetPendingApprovalsAsync()
     {
-        return await _httpClient.GetFromJsonAsync<PendingApprovalsResponse>("api/jobs/pending");
+        return await _httpClient.GetFromJsonAsync<PendingApprovalsResponse>("api/reviews/pending");
     }
 
     public async Task<ApproveRejectResponse?> ApproveJobAsync(string jobId, string? reviewedBy = null, string? comments = null)

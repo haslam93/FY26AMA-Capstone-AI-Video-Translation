@@ -483,11 +483,11 @@ public class TranslationFunctions
     }
 
     /// <summary>
-    /// GET /api/jobs/pending - Get all jobs pending human approval.
+    /// GET /api/reviews/pending - Get all jobs pending human approval.
     /// </summary>
     [Function("GetPendingApprovals")]
     public async Task<HttpResponseData> GetPendingApprovalsAsync(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "jobs/pending")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "reviews/pending")] HttpRequestData req,
         [DurableClient] DurableTaskClient durableClient)
     {
         _logger.LogInformation("GetPendingApprovals: Fetching jobs pending approval");
