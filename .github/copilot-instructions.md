@@ -48,12 +48,19 @@ Capstone/
 │   │   │   ├── CreateIterationActivity.cs
 │   │   │   ├── CreateTranslationActivity.cs
 │   │   │   ├── GetIterationStatusActivity.cs
+│   │   │   ├── RunValidationActivity.cs    # AI validation activity
 │   │   │   └── ValidateInputActivity.cs
+│   │   ├── Agents/                 # AI-powered agents
+│   │   │   ├── SubtitleValidationAgent.cs  # GPT-4o-mini validation
+│   │   │   ├── VttParsingService.cs        # WebVTT parser
+│   │   │   └── AgentConfigurationService.cs
 │   │   ├── Functions/              # HTTP trigger functions
-│   │   │   └── TranslationFunctions.cs
+│   │   │   ├── TranslationFunctions.cs
+│   │   │   └── ValidationFunctions.cs
 │   │   ├── Models/                 # Data models and DTOs
 │   │   │   ├── TranslationJob.cs
 │   │   │   ├── TranslationJobRequest.cs
+│   │   │   ├── TranslationWorkflowState.cs # Validation results
 │   │   │   └── SpeechApi/          # Speech API response models
 │   │   ├── Orchestration/          # Durable orchestrator
 │   │   │   └── VideoTranslationOrchestrator.cs
@@ -67,7 +74,8 @@ Capstone/
 │       ├── Pages/                  # Razor pages
 │       │   ├── Create.razor        # New job form
 │       │   ├── Index.razor         # Job dashboard
-│       │   └── JobDetails.razor    # Job status/results
+│       │   ├── JobDetails.razor    # Job status/results/approve/reject
+│       │   └── Reviews.razor       # Pending approvals dashboard
 │       ├── Models/                 # Client-side models
 │       │   └── JobModels.cs
 │       ├── Services/               # API client services
@@ -120,8 +128,11 @@ Capstone/
 | `/api/jobs` | POST | Create a new translation job |
 | `/api/jobs/{jobId}` | GET | Get job status and results |
 | `/api/jobs/{jobId}/iterate` | POST | Create a new iteration (re-translate) |
+| `/api/jobs/{jobId}/validate` | POST | Run AI validation on subtitles |
+| `/api/jobs/{jobId}/approve` | POST | Approve a translation job |
+| `/api/jobs/{jobId}/reject` | POST | Reject a translation job |
+| `/api/reviews/pending` | GET | List jobs pending approval |
 | `/api/upload` | POST | Upload video file directly |
-| `/api/health` | GET | Health check endpoint |
 
 ---
 
@@ -230,6 +241,16 @@ az functionapp config appsettings set `
 - Added Storage Account Contributor role to Function App
 - Removed IP restrictions (reverted for stability)
 
+### Phase 11: Multi-Agent Architecture ✅
+- GPT-4o-mini deployment to Azure AI Foundry
+- SubtitleValidationAgent for AI-powered quality analysis
+- 5-category scoring: Translation Accuracy, Grammar, Timing, Cultural Context, Formatting
+- RunValidationActivity for automatic validation after translation
+- Human-in-the-Loop approval gate with 3-day timeout
+- Reviews.razor page for pending approvals dashboard
+- Approve/reject buttons with reviewer info capture
+- New job statuses: RunningValidation, PendingApproval, Approved, Rejected
+
 ---
 
 ## Common Issues & Fixes
@@ -245,6 +266,14 @@ az role assignment create --assignee "<function-app-principal-id>" --role "Stora
 
 az functionapp restart --name "FuncApp-AMA-3" --resource-group "AMAFY26-deployment-3"
 ```
+
+### Reviews Page 404 Error
+**Cause**: Route conflict - `/api/jobs/pending` was matched by `/api/jobs/{jobId}`
+**Fix**: Endpoint moved to `/api/reviews/pending`. Redeploy latest Function App.
+
+### Jobs Stuck in PendingApproval
+**Cause**: Orchestrator waiting for human approval via WaitForExternalEvent
+**Fix**: Approve/reject via Reviews page or API. Jobs auto-reject after 3 days.
 
 ### SWA 403 Forbidden
 **Cause**: IP restrictions in `staticwebapp.config.json` blocking access

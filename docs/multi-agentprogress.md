@@ -182,24 +182,65 @@ This document tracks the implementation progress of the multi-agent architecture
 
 ---
 
-## Phase 4: Human-in-the-Loop ⬜ NOT STARTED
+## Phase 4: Human-in-the-Loop ✅ COMPLETE
 
 ### Tasks
 
 | Task | Status | Date | Notes |
 |------|--------|------|-------|
-| Create Review Queue API | ⬜ Not Started | - | GET/POST endpoints |
-| Build Review UI page | ⬜ Not Started | - | Blazor review page |
-| Implement approval workflow | ⬜ Not Started | - | Pause/resume orchestration |
-| Add subtitle editing | ⬜ Not Started | - | In-browser VTT editor |
-| Create notification system | ⬜ Not Started | - | Email/Teams notifications |
+| Update orchestrator workflow | ✅ Complete | 2026-01-13 | Auto-validation + approval gate with 3-day timeout |
+| Create RunValidationActivity | ✅ Complete | 2026-01-13 | Activity that calls SubtitleValidationAgent |
+| Create approve/reject API endpoints | ✅ Complete | 2026-01-13 | `POST /api/jobs/{id}/approve`, `POST /api/jobs/{id}/reject` |
+| Create pending approvals endpoint | ✅ Complete | 2026-01-13 | `GET /api/jobs/pending` |
+| Add ApprovalDecision model | ✅ Complete | 2026-01-13 | Reviewer, reason, comments fields |
+| Build Reviews UI page | ✅ Complete | 2026-01-13 | `Reviews.razor` with approval cards |
+| Update JobDetails with approve/reject | ✅ Complete | 2026-01-13 | Modal dialogs for approve/reject |
+| Add new job statuses | ✅ Complete | 2026-01-13 | `RunningValidation`, `PendingApproval`, `Approved`, `Rejected` |
+| Add navigation link | ✅ Complete | 2026-01-13 | Reviews link in nav menu |
 
-### Planned Files
-- `src/Api/Functions/ReviewFunctions.cs`
-- `src/Api/Models/ReviewDecision.cs`
-- `src/ui/Pages/Reviews.razor`
-- `src/ui/Pages/ReviewDetails.razor`
-- `src/ui/Components/SubtitleEditor.razor`
+### Workflow Changes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Translation Complete → AI Validation → PendingApproval → Approved/Rejected │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+- AI validation runs automatically after translation completes
+- Orchestrator waits for human approval using `WaitForExternalEvent`
+- 3-day timeout with auto-rejection if no response
+- Approval/rejection with reviewer name, reason, and comments
+
+### New API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs/pending` | GET | List all jobs pending approval |
+| `/api/jobs/{jobId}/approve` | POST | Approve a translation job |
+| `/api/jobs/{jobId}/reject` | POST | Reject a translation job |
+
+### Files Created/Modified
+
+#### API (Backend)
+- `src/Api/Activities/RunValidationActivity.cs` - Activity to run AI validation
+- `src/Api/Orchestration/VideoTranslationOrchestrator.cs` - Added validation + approval gate
+- `src/Api/Functions/TranslationFunctions.cs` - Added approve/reject/pending endpoints
+- `src/Api/Models/TranslationJob.cs` - Added validation result, approval decision fields
+
+#### UI (Frontend)
+- `src/ui/Pages/Reviews.razor` - Pending approvals page with approve/reject modals
+- `src/ui/Pages/JobDetails.razor` - Added approve/reject buttons and modals
+- `src/ui/Layout/NavMenu.razor` - Added Reviews navigation link
+- `src/ui/Services/TranslationApiService.cs` - Added approve/reject/pending methods
+- `src/ui/Models/JobModels.cs` - Added approval-related DTOs
+
+### New Job Status Flow
+
+```
+Submitted → Validating → Processing → CopyingOutputs → RunningValidation 
+    → PendingApproval → Approved/Rejected (or auto-rejected after 3 days)
+```
 
 ---
 
@@ -338,3 +379,17 @@ az cognitiveservices account deployment list `
 | 2026-01-13 | Added AI Foundry settings to function-app.bicep for IaC | Copilot |
 | 2026-01-13 | Updated main.bicep to pass AI Foundry params to Function App | Copilot |
 | 2026-01-13 | **Phase 3 Deployed & Validated** - End-to-end workflow tested | Copilot |
+| 2026-01-14 | **Phase 4 Started** - Human-in-the-Loop Approval Gate | Copilot |
+| 2026-01-14 | Created RunValidationActivity for automatic AI validation | Copilot |
+| 2026-01-14 | Updated orchestrator with validation step + WaitForExternalEvent approval gate | Copilot |
+| 2026-01-14 | Added 3-day timeout with auto-rejection for pending approvals | Copilot |
+| 2026-01-14 | Added new job statuses: RunningValidation, PendingApproval, Approved, Rejected | Copilot |
+| 2026-01-14 | Created approve/reject/pending API endpoints in TranslationFunctions | Copilot |
+| 2026-01-14 | Created Reviews.razor page for pending approvals dashboard | Copilot |
+| 2026-01-14 | Updated JobDetails.razor with approve/reject buttons and modals | Copilot |
+| 2026-01-14 | Updated NavMenu.razor with Reviews navigation link | Copilot |
+| 2026-01-14 | Updated TranslationApiService with approval methods | Copilot |
+| 2026-01-14 | Updated JobModels.cs with approval-related DTOs | Copilot |
+| 2026-01-14 | Fixed ApprovalDecision missing closing brace | Copilot |
+| 2026-01-14 | Fixed variable name conflict in orchestrator (validationResult → subtitleValidation) | Copilot |
+| 2026-01-14 | **Phase 4 Complete** - API and UI builds succeeded | Copilot |

@@ -65,8 +65,27 @@ builder.Services.AddSingleton<IAgentConfiguration, AgentConfigurationService>();
 // Register VTT Parsing Service for subtitle analysis
 builder.Services.AddHttpClient<IVttParsingService, VttParsingService>();
 
-// Register Subtitle Validation Agent
+// Register Subtitle Validation Agent (legacy direct chat approach)
 builder.Services.AddScoped<ISubtitleValidationAgent, SubtitleValidationAgent>();
+
+// Configure Foundry Agent Service Options
+builder.Services.Configure<FoundryAgentOptions>(options =>
+{
+    options.ProjectEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
+    options.ModelDeploymentName = Environment.GetEnvironmentVariable("FOUNDRY_MODEL_DEPLOYMENT") ?? "gpt-4o-mini";
+    options.AgentName = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_NAME") ?? "SubtitleValidationAgent";
+});
+
+// Register Foundry Agent Tool Handler (provides tools for the agent)
+builder.Services.AddScoped<FoundryToolHandler>();
+
+// Register Foundry Agent Service (uses Azure AI Foundry Persistent Agents SDK)
+// Only register if the endpoint is configured
+var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
+if (!string.IsNullOrEmpty(foundryEndpoint))
+{
+    builder.Services.AddScoped<IFoundryAgentService, FoundryAgentService>();
+}
 
 // Add Application Insights
 builder.Services

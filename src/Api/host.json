@@ -8,5 +8,14 @@
             },
             "enableLiveMetricsFilters": true
         }
+    },
+    "extensions": {
+        "durableTask": {
+            "storageProvider": {
+                "partitionCount": 4
+            },
+            "maxConcurrentActivityFunctions": 10,
+            "maxConcurrentOrchestratorFunctions": 10
+        }
     }
 }

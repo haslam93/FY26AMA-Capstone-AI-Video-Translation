@@ -85,6 +85,60 @@ public class TranslationJob
     /// </summary>
     [JsonPropertyName("error")]
     public string? Error { get; set; }
+
+    /// <summary>
+    /// AI validation result for the subtitles.
+    /// </summary>
+    [JsonPropertyName("validationResult")]
+    public SubtitleValidationResult? ValidationResult { get; set; }
+
+    /// <summary>
+    /// Human approval decision.
+    /// </summary>
+    [JsonPropertyName("approvalDecision")]
+    public ApprovalDecision? ApprovalDecision { get; set; }
+
+    /// <summary>
+    /// Timestamp when approval was requested.
+    /// </summary>
+    [JsonPropertyName("approvalRequestedAt")]
+    public DateTime? ApprovalRequestedAt { get; set; }
+
+    /// <summary>
+    /// Timestamp when approval decision was made.
+    /// </summary>
+    [JsonPropertyName("approvalDecisionAt")]
+    public DateTime? ApprovalDecisionAt { get; set; }
+}
+
+/// <summary>
+/// Human approval decision for a translation job.
+/// </summary>
+public class ApprovalDecision
+{
+    /// <summary>
+    /// Whether the translation was approved.
+    /// </summary>
+    [JsonPropertyName("approved")]
+    public bool Approved { get; set; }
+
+    /// <summary>
+    /// Name or ID of the reviewer.
+    /// </summary>
+    [JsonPropertyName("reviewedBy")]
+    public string? ReviewedBy { get; set; }
+
+    /// <summary>
+    /// Reason for rejection (if rejected).
+    /// </summary>
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
+
+    /// <summary>
+    /// Additional comments from reviewer.
+    /// </summary>
+    [JsonPropertyName("comments")]
+    public string? Comments { get; set; }
 }
 
 /// <summary>
@@ -102,6 +156,10 @@ public enum JobStatus
     IterationCreated,
     Processing,
     CopyingOutputs,
+    RunningValidation,
+    PendingApproval,
+    Approved,
+    Rejected,
     Completed,
     Failed
 }

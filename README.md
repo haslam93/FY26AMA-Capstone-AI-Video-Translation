@@ -40,6 +40,9 @@ A cloud-native video translation service built on Azure that automatically trans
 | **Subtitle Generation** | Automatic WebVTT subtitle creation |
 | **Burned-in Subtitles** | Option to embed subtitles in output video |
 | **Job Dashboard** | Track all translation jobs with status updates |
+| **AI Quality Validation** | GPT-4o-mini powered subtitle quality analysis |
+| **Human Approval Gate** | Review and approve/reject translations |
+| **Auto-Rejection** | Jobs auto-rejected after 3-day timeout |
 
 ## Project Structure
 
@@ -47,12 +50,13 @@ A cloud-native video translation service built on Azure that automatically trans
 ├── src/
 │   ├── Api/                    # Azure Durable Functions backend
 │   │   ├── Activities/         # Workflow activity functions
+│   │   ├── Agents/             # AI agents (SubtitleValidationAgent)
 │   │   ├── Functions/          # HTTP trigger functions
 │   │   ├── Models/             # Data models and DTOs
 │   │   ├── Orchestration/      # Durable orchestrator
 │   │   └── Services/           # Business logic services
 │   └── ui/                     # Blazor WebAssembly frontend
-│       ├── Pages/              # Razor pages (Dashboard, Create, Details)
+│       ├── Pages/              # Razor pages (Dashboard, Create, Details, Reviews)
 │       ├── Models/             # Client-side models
 │       ├── Services/           # API client services
 │       └── wwwroot/            # Static assets & config
