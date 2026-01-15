@@ -19,16 +19,19 @@ public class TranslationFunctions
     private readonly ILogger<TranslationFunctions> _logger;
     private readonly IBlobStorageService _blobService;
     private readonly IFoundryAgentService? _foundryAgentService;
+    private readonly IMultiAgentValidationService? _multiAgentService;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public TranslationFunctions(
         ILogger<TranslationFunctions> logger,
         IBlobStorageService blobService,
-        IFoundryAgentService? foundryAgentService = null)
+        IFoundryAgentService? foundryAgentService = null,
+        IMultiAgentValidationService? multiAgentService = null)
     {
         _logger = logger;
         _blobService = blobService;
         _foundryAgentService = foundryAgentService;
+        _multiAgentService = multiAgentService;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -713,6 +716,7 @@ public class TranslationFunctions
 
     /// <summary>
     /// POST /api/jobs/{jobId}/chat - Send a message to the validation agent for a job.
+    /// Supports multi-agent routing via agentType parameter.
     /// </summary>
     [Function("ChatWithAgent")]
     public async Task<HttpResponseData> ChatWithAgentAsync(
@@ -724,11 +728,11 @@ public class TranslationFunctions
 
         try
         {
-            // Check if Foundry Agent Service is available
-            if (_foundryAgentService == null)
+            // Check if any agent service is available
+            if (_multiAgentService == null && _foundryAgentService == null)
             {
                 return await CreateErrorResponse(req, HttpStatusCode.ServiceUnavailable, 
-                    "Chat functionality is not available - Foundry Agent Service not configured");
+                    "Chat functionality is not available - Agent Service not configured");
             }
 
             // Get the job to retrieve thread ID - MUST use getInputsAndOutputs to get SerializedCustomStatus
@@ -758,13 +762,6 @@ public class TranslationFunctions
                     $"Job {jobId} state not available - validation may not have been run yet");
             }
 
-            // Check for thread ID
-            if (string.IsNullOrEmpty(job.ValidationThreadId))
-            {
-                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
-                    $"Job {jobId} does not have a validation thread - validation may not have been run yet");
-            }
-
             // Parse the message from request body
             var body = await req.ReadAsStringAsync();
             var chatRequest = string.IsNullOrEmpty(body) ? null : 
@@ -775,13 +772,45 @@ public class TranslationFunctions
                 return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Message is required");
             }
 
-            // Send message to agent
-            var agentResponse = await _foundryAgentService.SendFollowUpMessageAsync(
-                job.ValidationThreadId,
-                chatRequest.Message,
-                job);
+            string agentResponse;
+            var agentType = chatRequest.AgentType?.ToLowerInvariant() ?? "orchestrator";
 
-            _logger.LogInformation("ChatWithAgent: Agent responded for job {JobId}", jobId);
+            // Try multi-agent service first
+            if (_multiAgentService != null && job.MultiAgentValidation != null)
+            {
+                var threadId = _multiAgentService.GetThreadIdForAgent(job.MultiAgentValidation, agentType);
+                
+                if (string.IsNullOrEmpty(threadId))
+                {
+                    return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                        $"Thread not found for agent type '{agentType}' - validation may not have been run yet");
+                }
+
+                _logger.LogInformation("ChatWithAgent: Routing to {AgentType} agent for job {JobId}", agentType, jobId);
+                
+                agentResponse = await _multiAgentService.SendMessageToAgentAsync(
+                    agentType,
+                    threadId,
+                    chatRequest.Message,
+                    job);
+            }
+            // Fallback to legacy single-agent
+            else if (_foundryAgentService != null && !string.IsNullOrEmpty(job.ValidationThreadId))
+            {
+                _logger.LogInformation("ChatWithAgent: Using legacy single agent for job {JobId}", jobId);
+                
+                agentResponse = await _foundryAgentService.SendFollowUpMessageAsync(
+                    job.ValidationThreadId,
+                    chatRequest.Message,
+                    job);
+            }
+            else
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Job {jobId} does not have a validation thread - validation may not have been run yet");
+            }
+
+            _logger.LogInformation("ChatWithAgent: {AgentType} agent responded for job {JobId}", agentType, jobId);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json");
@@ -930,7 +959,16 @@ public class RejectionRequest
 /// </summary>
 public class ChatRequest
 {
+    /// <summary>
+    /// The message to send to the agent.
+    /// </summary>
     public string? Message { get; set; }
+    
+    /// <summary>
+    /// The type of agent to route the message to.
+    /// Values: "orchestrator" (default), "translation", "technical", "cultural"
+    /// </summary>
+    public string? AgentType { get; set; }
 }
 
 /// <summary>

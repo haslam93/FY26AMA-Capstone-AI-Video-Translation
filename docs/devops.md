@@ -358,4 +358,6 @@ az bicep build --file infra/main.bicep
 - [ ] Implement approval gates for production deployments
 - [ ] Add Slack/Teams notifications for deployment status
 - [ ] Add performance/load tests in CI
-- [ ] Implement multi-agent subtitle validation
+- [x] ~~Implement multi-agent subtitle validation~~ ✅ Completed (Phase 12)
+- [ ] Add multi-agent validation unit tests
+- [ ] Add agent-specific configuration per environment

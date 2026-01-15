@@ -323,6 +323,22 @@ public static class VideoTranslationOrchestrator
                     subtitleValidation.ValidationResult.ConfidenceScore,
                     subtitleValidation.ValidationResult.IsValid);
             }
+            else if (subtitleValidation.Success && subtitleValidation.MultiAgentResult != null)
+            {
+                // Multi-Agent validation result (4 specialist agents)
+                job.MultiAgentValidation = subtitleValidation.MultiAgentResult;
+                
+                // Also set legacy fields for backward compatibility
+                job.ValidationThreadId = subtitleValidation.MultiAgentResult.OrchestratorThreadId;
+                
+                logger.LogInformation(
+                    "Job {JobId}: Multi-agent validation complete. " +
+                    "Overall={Overall:F1}, Recommendation={Rec}, Issues={Issues}",
+                    job.JobId,
+                    subtitleValidation.MultiAgentResult.OverallScore,
+                    subtitleValidation.MultiAgentResult.Recommendation,
+                    subtitleValidation.MultiAgentResult.AllIssues?.Count ?? 0);
+            }
             else
             {
                 logger.LogWarning("Job {JobId}: Validation failed: {Error}", job.JobId, subtitleValidation.Error);

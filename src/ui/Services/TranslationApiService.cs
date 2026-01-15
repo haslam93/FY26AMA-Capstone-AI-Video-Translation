@@ -17,8 +17,21 @@ public interface ITranslationApiService
     Task<ApproveRejectResponse?> RejectJobAsync(string jobId, string? reviewedBy = null, string? reason = null, string? comments = null);
     Task<UploadResponse?> UploadVideoAsync(Stream fileStream, string fileName, IProgress<int>? progress = null);
     Task<ValidationResponse?> ValidateSubtitlesAsync(string jobId);
-    Task<ChatResponse?> SendChatMessageAsync(string jobId, string message);
-    Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId);
+    
+    /// <summary>
+    /// Send a chat message to a validation agent.
+    /// </summary>
+    /// <param name="jobId">The job ID.</param>
+    /// <param name="message">The message to send.</param>
+    /// <param name="agentType">Optional agent type: "orchestrator" (default), "translation", "technical", "cultural"</param>
+    Task<ChatResponse?> SendChatMessageAsync(string jobId, string message, string? agentType = null);
+    
+    /// <summary>
+    /// Get chat history for a job.
+    /// </summary>
+    /// <param name="jobId">The job ID.</param>
+    /// <param name="agentType">Optional agent type for multi-agent systems.</param>
+    Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId, string? agentType = null);
 }
 
 /// <summary>
@@ -88,17 +101,22 @@ public class TranslationApiService : ITranslationApiService
         return await response.Content.ReadFromJsonAsync<ValidationResponse>();
     }
 
-    public async Task<ChatResponse?> SendChatMessageAsync(string jobId, string message)
+    public async Task<ChatResponse?> SendChatMessageAsync(string jobId, string message, string? agentType = null)
     {
-        var request = new ChatRequest { Message = message };
+        var request = new ChatRequest { Message = message, AgentType = agentType };
         var response = await _httpClient.PostAsJsonAsync($"api/jobs/{jobId}/chat", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ChatResponse>();
     }
 
-    public async Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId)
+    public async Task<ChatHistoryResponse?> GetChatHistoryAsync(string jobId, string? agentType = null)
     {
-        return await _httpClient.GetFromJsonAsync<ChatHistoryResponse>($"api/jobs/{jobId}/chat/history");
+        var url = $"api/jobs/{jobId}/chat/history";
+        if (!string.IsNullOrEmpty(agentType))
+        {
+            url += $"?agentType={Uri.EscapeDataString(agentType)}";
+        }
+        return await _httpClient.GetFromJsonAsync<ChatHistoryResponse>(url);
     }
 
     private static string GetContentType(string fileName)

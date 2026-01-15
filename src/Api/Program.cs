@@ -90,7 +90,13 @@ var foundryEndpoint = Environment.GetEnvironmentVariable("AIFoundry:ProjectEndpo
     ?? Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
 if (!string.IsNullOrEmpty(foundryEndpoint))
 {
+    // Legacy single-agent service (kept for backward compatibility)
     builder.Services.AddScoped<IFoundryAgentService, FoundryAgentService>();
+    
+    // Multi-Agent Validation Service - orchestrates 4 specialist agents
+    // Agents: Orchestrator, Translation, Technical, Cultural
+    // All agents run in PARALLEL for faster execution
+    builder.Services.AddScoped<IMultiAgentValidationService, MultiAgentValidationService>();
 }
 
 // Add Application Insights

@@ -98,6 +98,42 @@ Building a video translation service with:
 | Quality Scoring | 5-category scoring (Translation, Grammar, Timing, Cultural, Formatting) |
 | Human Approval Gate | Jobs wait for human approval after AI validation |
 | Reviews Dashboard | `/reviews` page to manage pending approvals |
+
+### Phase 12: Multi-Agent Parallel Validation ✅ Complete (2026-01-14)
+
+**Goal**: Replace single-agent validation with 4-agent parallel system for comprehensive quality assessment
+
+**Tasks**:
+- [x] Create `MultiAgentValidationResult` model with weighted scoring
+- [x] Create `IMultiAgentValidationService` interface
+- [x] Implement `MultiAgentValidationService` with 4 specialized agents
+- [x] Update `RunValidationActivity` to use multi-agent system
+- [x] Add agent-specific chat endpoints with agent type selection
+- [x] Update UI models with multi-agent support
+- [x] Update `JobDetails.razor` with multi-agent score display
+- [x] Deploy and test end-to-end
+
+**Multi-Agent System**:
+| Agent | Weight | Responsibility |
+|-------|--------|----------------|
+| **Orchestrator** | - | Coordinates workflow, aggregates scores, provides summary |
+| **Translation Agent** | 40% | Semantic accuracy, meaning preservation, fluency |
+| **Technical Agent** | 30% | Timing sync, CPS rate, line length, WebVTT format |
+| **Cultural Agent** | 30% | Cultural adaptation, idioms, regional appropriateness |
+
+**Score Thresholds**:
+| Score Range | Recommendation | Action |
+|-------------|----------------|--------|
+| ≥ 80 | **Approve** | Translation meets quality standards |
+| 50-79 | **NeedsReview** | Human review recommended |
+| < 50 | **Reject** | Translation quality insufficient |
+
+**Key Implementation Details**:
+- All specialist agents run in **parallel** using `Task.WhenAll` for performance
+- Per-agent model configuration support via `FoundryAgentOptions.AgentModels`
+- Uses `Azure.AI.Agents.Persistent` SDK with `PersistentAgentsClient`
+- Agent chat with dropdown selector for agent-specific conversations
+- Color-coded score cards in UI (green/yellow/red based on thresholds)
 | Auto-Rejection | Jobs auto-rejected after 3 days without response |
 
 **New API Endpoints**:
@@ -128,7 +164,17 @@ Building a video translation service with:
 
 ### Completed Phases
 
-#### Phase 12: UI & Orchestrator State Fixes ✅ Complete (2026-01-14)
+#### Phase 12: Multi-Agent Parallel Validation ✅ Complete (2026-01-14)
+- [x] Created MultiAgentValidationResult model with weighted scoring
+- [x] Created IMultiAgentValidationService interface
+- [x] Implemented MultiAgentValidationService with 4 specialized agents
+- [x] Updated RunValidationActivity to use multi-agent system
+- [x] Added agent-specific chat endpoints with agent type selection
+- [x] Updated UI models with multi-agent support
+- [x] Updated JobDetails.razor with multi-agent score display
+- [x] Deploy and test end-to-end
+
+#### Phase 11: Single-Agent Architecture ✅ Complete (Superseded by Phase 12)
 - [x] Fixed Storage Blob Delegator role for SAS token generation (403 errors)
 - [x] Fixed orchestrator approval timeout using CancellationTokenSource
 - [x] Added `context.SetCustomStatus(job)` to expose job state during approval wait
@@ -276,6 +322,11 @@ Building a video translation service with:
 | 2026-01-14 | Fix | Added SetCustomStatus for UI to see PendingApproval state | ✅ Done |
 | 2026-01-14 | Fix | Updated UI to show validation results during approval | ✅ Done |
 | 2026-01-14 | Cleanup | Terminated stuck orchestration instances | ✅ Done |
+| 2026-01-14 | Multi-Agent | Created MultiAgentValidationResult model | ✅ Done |
+| 2026-01-14 | Multi-Agent | Implemented 4-agent parallel validation system | ✅ Done |
+| 2026-01-14 | Multi-Agent | Added agent chat with dropdown selector | ✅ Done |
+| 2026-01-14 | Multi-Agent | Updated UI with multi-agent score cards | ✅ Done |
+| 2026-01-14 | Deploy | Deployed multi-agent system to Azure | ✅ Done |
 
 ---
 

@@ -11,10 +11,12 @@ namespace VideoTranslation.Api.Activities;
 
 /// <summary>
 /// Activity that runs AI-powered subtitle validation.
-/// Uses Azure AI Foundry Agent Service when available, falls back to direct chat.
+/// Uses Multi-Agent Validation Service (4 specialist agents running in parallel).
+/// Falls back to legacy single-agent if multi-agent is not available.
 /// </summary>
 public class RunValidationActivity
 {
+    private readonly IMultiAgentValidationService? _multiAgentService;
     private readonly IFoundryAgentService? _foundryAgentService;
     private readonly ISubtitleValidationAgent _validationAgent;
     private readonly ILogger<RunValidationActivity> _logger;
@@ -22,8 +24,10 @@ public class RunValidationActivity
     public RunValidationActivity(
         ISubtitleValidationAgent validationAgent,
         ILogger<RunValidationActivity> logger,
+        IMultiAgentValidationService? multiAgentService = null,
         IFoundryAgentService? foundryAgentService = null)
     {
+        _multiAgentService = multiAgentService;
         _foundryAgentService = foundryAgentService;
         _validationAgent = validationAgent;
         _logger = logger;
@@ -48,10 +52,41 @@ public class RunValidationActivity
                 };
             }
 
-            // Try Foundry Agent Service first (if available)
+            // PRIMARY: Try Multi-Agent Validation Service (4 agents in parallel)
+            if (_multiAgentService != null && input.Job != null)
+            {
+                _logger.LogInformation("Job {JobId}: Using Multi-Agent Validation Service (4 specialists)", input.JobId);
+                
+                try
+                {
+                    var multiAgentResult = await _multiAgentService.RunValidationAsync(input.Job);
+                    
+                    _logger.LogInformation(
+                        "Job {JobId}: Multi-agent validation complete. " +
+                        "Overall={Overall:F1}, Translation={T:F1}, Technical={Te:F1}, Cultural={C:F1}, Rec={Rec}",
+                        input.JobId,
+                        multiAgentResult.OverallScore,
+                        multiAgentResult.TranslationReview?.Score ?? 0,
+                        multiAgentResult.TechnicalReview?.Score ?? 0,
+                        multiAgentResult.CulturalReview?.Score ?? 0,
+                        multiAgentResult.Recommendation);
+
+                    return new RunValidationResult
+                    {
+                        Success = true,
+                        MultiAgentResult = multiAgentResult
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Job {JobId}: Multi-agent validation failed, falling back", input.JobId);
+                }
+            }
+
+            // FALLBACK 1: Try Foundry Agent Service (single agent)
             if (_foundryAgentService != null && input.Job != null)
             {
-                _logger.LogInformation("Job {JobId}: Using Foundry Agent Service for validation", input.JobId);
+                _logger.LogInformation("Job {JobId}: Using Foundry Agent Service (single agent)", input.JobId);
                 
                 var agentResult = await _foundryAgentService.RunValidationAsync(input.Job);
                 
@@ -79,7 +114,7 @@ public class RunValidationActivity
                 }
             }
 
-            // Fallback to legacy direct chat validation
+            // FALLBACK 2: Legacy direct chat validation
             _logger.LogInformation("Job {JobId}: Using legacy SubtitleValidationAgent", input.JobId);
             
             var validationResult = await _validationAgent.ValidateAsync(
@@ -136,10 +171,20 @@ public class RunValidationResult
 {
     public bool Success { get; set; }
     public string? Error { get; set; }
+    
+    /// <summary>
+    /// Legacy single-agent validation result.
+    /// </summary>
     public SubtitleValidationResult? ValidationResult { get; set; }
     
     /// <summary>
-    /// Thread ID for follow-up conversations (from Foundry Agent Service).
+    /// Thread ID for follow-up conversations (from legacy Foundry Agent Service).
     /// </summary>
     public string? ThreadId { get; set; }
+    
+    /// <summary>
+    /// Multi-agent validation result (4 specialist agents).
+    /// This is the primary result when multi-agent service is available.
+    /// </summary>
+    public MultiAgentValidationResult? MultiAgentResult { get; set; }
 }

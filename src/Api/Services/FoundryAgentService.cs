@@ -36,6 +36,26 @@ public class FoundryAgentOptions
     /// Agent ID (populated after creation).
     /// </summary>
     public string? AgentId { get; set; }
+
+    /// <summary>
+    /// Optional per-agent model configuration for multi-agent system.
+    /// Keys: "Orchestrator", "Translation", "Technical", "Cultural"
+    /// Values: Model deployment names (e.g., "gpt-4o", "gpt-4o-mini")
+    /// 
+    /// If not specified, ModelDeploymentName is used for all agents.
+    /// 
+    /// Example configuration in appsettings.json:
+    /// {
+    ///   "FoundryAgent": {
+    ///     "ModelDeploymentName": "gpt-4o-mini",
+    ///     "AgentModels": {
+    ///       "Orchestrator": "gpt-4o",
+    ///       "Translation": "gpt-4o-mini"
+    ///     }
+    ///   }
+    /// }
+    /// </summary>
+    public Dictionary<string, string>? AgentModels { get; set; }
 }
 
 /// <summary>

@@ -48,24 +48,24 @@ Capstone/
 │   │   │   ├── CreateIterationActivity.cs
 │   │   │   ├── CreateTranslationActivity.cs
 │   │   │   ├── GetIterationStatusActivity.cs
-│   │   │   ├── RunValidationActivity.cs    # AI validation activity
+│   │   │   ├── RunValidationActivity.cs    # Multi-agent validation activity
 │   │   │   └── ValidateInputActivity.cs
-│   │   ├── Agents/                 # AI-powered agents
-│   │   │   ├── SubtitleValidationAgent.cs  # GPT-4o-mini validation
-│   │   │   ├── VttParsingService.cs        # WebVTT parser
-│   │   │   └── AgentConfigurationService.cs
 │   │   ├── Functions/              # HTTP trigger functions
 │   │   │   ├── TranslationFunctions.cs
 │   │   │   └── ValidationFunctions.cs
 │   │   ├── Models/                 # Data models and DTOs
+│   │   │   ├── MultiAgentValidationResult.cs  # Multi-agent scoring models
 │   │   │   ├── TranslationJob.cs
 │   │   │   ├── TranslationJobRequest.cs
-│   │   │   ├── TranslationWorkflowState.cs # Validation results
+│   │   │   ├── TranslationWorkflowState.cs
 │   │   │   └── SpeechApi/          # Speech API response models
 │   │   ├── Orchestration/          # Durable orchestrator
 │   │   │   └── VideoTranslationOrchestrator.cs
 │   │   ├── Services/               # Business logic services
 │   │   │   ├── BlobStorageService.cs
+│   │   │   ├── FoundryAgentService.cs          # Azure AI Foundry integration
+│   │   │   ├── IMultiAgentValidationService.cs # Multi-agent interface
+│   │   │   ├── MultiAgentValidationService.cs  # 4-agent parallel validation
 │   │   │   └── SpeechTranslationService.cs
 │   │   ├── Program.cs              # DI configuration
 │   │   └── local.settings.json     # Local dev settings
@@ -128,7 +128,9 @@ Capstone/
 | `/api/jobs` | POST | Create a new translation job |
 | `/api/jobs/{jobId}` | GET | Get job status and results |
 | `/api/jobs/{jobId}/iterate` | POST | Create a new iteration (re-translate) |
-| `/api/jobs/{jobId}/validate` | POST | Run AI validation on subtitles |
+| `/api/jobs/{jobId}/validate` | POST | Run multi-agent validation on subtitles |
+| `/api/jobs/{jobId}/chat` | POST | Send message to agent (with agentType query param) |
+| `/api/jobs/{jobId}/chat` | GET | Get chat history (with agentType query param) |
 | `/api/jobs/{jobId}/approve` | POST | Approve a translation job |
 | `/api/jobs/{jobId}/reject` | POST | Reject a translation job |
 | `/api/reviews/pending` | GET | List jobs pending approval |
@@ -243,8 +245,15 @@ az functionapp config appsettings set `
 
 ### Phase 11: Multi-Agent Architecture ✅
 - GPT-4o-mini deployment to Azure AI Foundry
-- SubtitleValidationAgent for AI-powered quality analysis
-- 5-category scoring: Translation Accuracy, Grammar, Timing, Cultural Context, Formatting
+- **4-Agent Parallel Validation System**:
+  - **Orchestrator Agent**: Coordinates workflow, aggregates scores, provides summary
+  - **Translation Agent (40%)**: Semantic accuracy, meaning preservation, fluency
+  - **Technical Agent (30%)**: Timing sync, CPS rate, line length, WebVTT format
+  - **Cultural Agent (30%)**: Cultural adaptation, idioms, regional appropriateness
+- Score thresholds: ≥80 Approve, 50-79 NeedsReview, <50 Reject
+- `MultiAgentValidationService` with parallel execution (`Task.WhenAll`)
+- Per-agent model configuration via `FoundryAgentOptions.AgentModels`
+- Agent chat with dropdown selector for agent-specific conversations
 - RunValidationActivity for automatic validation after translation
 - Human-in-the-Loop approval gate with 3-day timeout
 - Reviews.razor page for pending approvals dashboard
@@ -318,7 +327,13 @@ dotnet run
     "SpeechServiceEndpoint": "https://speech-ama-3.cognitiveservices.azure.com",
     "SpeechServiceRegion": "eastus2",
     "SpeechServiceKey": "<your-key>",
-    "BlobStorageConnectionString": "<your-connection-string>"
+    "BlobStorageConnectionString": "<your-connection-string>",
+    "FoundryAgent__Endpoint": "https://<your-foundry>.cognitiveservices.azure.com",
+    "FoundryAgent__ModelDeploymentName": "gpt-4o-mini",
+    "FoundryAgent__AgentModels__Orchestrator": "gpt-4o-mini",
+    "FoundryAgent__AgentModels__Translation": "gpt-4o-mini",
+    "FoundryAgent__AgentModels__Technical": "gpt-4o-mini",
+    "FoundryAgent__AgentModels__Cultural": "gpt-4o-mini"
   }
 }
 ```

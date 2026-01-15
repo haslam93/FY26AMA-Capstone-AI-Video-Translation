@@ -87,17 +87,25 @@ public class TranslationJob
     public string? Error { get; set; }
 
     /// <summary>
-    /// AI validation result for the subtitles.
+    /// AI validation result for the subtitles (legacy single-agent).
+    /// Deprecated: Use MultiAgentValidation for new jobs.
     /// </summary>
     [JsonPropertyName("validationResult")]
     public SubtitleValidationResult? ValidationResult { get; set; }
 
     /// <summary>
-    /// Thread ID for the Foundry Agent conversation.
-    /// Used for follow-up chat interactions with the validation agent.
+    /// Thread ID for the Foundry Agent conversation (legacy single-agent).
+    /// Deprecated: Use MultiAgentValidation.OrchestratorThreadId for new jobs.
     /// </summary>
     [JsonPropertyName("validationThreadId")]
     public string? ValidationThreadId { get; set; }
+
+    /// <summary>
+    /// Multi-agent validation result containing scores from all specialist agents.
+    /// This is the primary validation result for new jobs.
+    /// </summary>
+    [JsonPropertyName("multiAgentValidation")]
+    public MultiAgentValidationResult? MultiAgentValidation { get; set; }
 
     /// <summary>
     /// Human approval decision.
