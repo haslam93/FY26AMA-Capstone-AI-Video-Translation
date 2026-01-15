@@ -142,12 +142,18 @@
                     </div>
 
                     @* AI Quality Validation Section *@
-                    <div class="card mb-4 @(CurrentValidationResult != null ? (CurrentValidationResult.IsValid ? "border-success" : "border-warning") : "")">
+                    <div class="card mb-4 @GetValidationCardBorderClass()">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
                                 <i class="bi bi-robot"></i> AI Quality Validation
                             </h5>
-                            @if (CurrentValidationResult != null)
+                            @if (job.HasMultiAgentValidation && job.MultiAgentValidation != null)
+                            {
+                                <span class="badge @job.MultiAgentValidation.RecommendationBadgeClass fs-6">
+                                    @job.MultiAgentValidation.Recommendation
+                                </span>
+                            }
+                            else if (CurrentValidationResult != null)
                             {
                                 <span class="badge @(CurrentValidationResult.IsValid ? "bg-success" : "bg-warning") fs-6">
                                     @(CurrentValidationResult.ConfidenceScore.ToString("P0"))
@@ -161,7 +167,7 @@
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Analyzing...</span>
                                     </div>
-                                    <p class="mt-2 mb-0 text-muted">AI agent is analyzing subtitles...</p>
+                                    <p class="mt-2 mb-0 text-muted">AI agents are analyzing subtitles in parallel...</p>
                                 </div>
                             }
                             else if (validationError != null)
@@ -170,8 +176,204 @@
                                     <i class="bi bi-exclamation-triangle"></i> @validationError
                                 </div>
                             }
+                            else if (job.HasMultiAgentValidation && job.MultiAgentValidation != null)
+                            {
+                                @* Multi-Agent Validation Display *@
+                                var multiAgent = job.MultiAgentValidation;
+                                
+                                @* Overall Weighted Score *@
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Overall Weighted Score</span>
+                                        <strong class="@multiAgent.ScoreColorClass">
+                                            @multiAgent.OverallScore%
+                                        </strong>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar @(multiAgent.OverallScore >= 80 ? "bg-success" : multiAgent.OverallScore >= 50 ? "bg-warning" : "bg-danger")"
+                                             role="progressbar" 
+                                             style="width: @multiAgent.OverallScore%"
+                                             aria-valuenow="@multiAgent.OverallScore" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <div class="small text-muted mt-1">
+                                        Weights: Translation 40% • Technical 30% • Cultural 30%
+                                    </div>
+                                </div>
+
+                                @* Agent Score Cards *@
+                                <h6 class="mb-3">Agent Scores</h6>
+                                <div class="row row-cols-3 g-2 mb-4">
+                                    @if (multiAgent.TranslationAgent != null)
+                                    {
+                                        <div class="col">
+                                            <div class="card @(multiAgent.TranslationAgent.Score >= 80 ? "border-success" : multiAgent.TranslationAgent.Score >= 50 ? "border-warning" : "border-danger")">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="fs-4">📝</div>
+                                                    <div class="small text-muted">Translation</div>
+                                                    <strong class="fs-5 @(multiAgent.TranslationAgent.Score >= 80 ? "text-success" : multiAgent.TranslationAgent.Score >= 50 ? "text-warning" : "text-danger")">
+                                                        @multiAgent.TranslationAgent.Score%
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (multiAgent.TechnicalAgent != null)
+                                    {
+                                        <div class="col">
+                                            <div class="card @(multiAgent.TechnicalAgent.Score >= 80 ? "border-success" : multiAgent.TechnicalAgent.Score >= 50 ? "border-warning" : "border-danger")">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="fs-4">⚙️</div>
+                                                    <div class="small text-muted">Technical</div>
+                                                    <strong class="fs-5 @(multiAgent.TechnicalAgent.Score >= 80 ? "text-success" : multiAgent.TechnicalAgent.Score >= 50 ? "text-warning" : "text-danger")">
+                                                        @multiAgent.TechnicalAgent.Score%
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (multiAgent.CulturalAgent != null)
+                                    {
+                                        <div class="col">
+                                            <div class="card @(multiAgent.CulturalAgent.Score >= 80 ? "border-success" : multiAgent.CulturalAgent.Score >= 50 ? "border-warning" : "border-danger")">
+                                                <div class="card-body p-2 text-center">
+                                                    <div class="fs-4">🌍</div>
+                                                    <div class="small text-muted">Cultural</div>
+                                                    <strong class="fs-5 @(multiAgent.CulturalAgent.Score >= 80 ? "text-success" : multiAgent.CulturalAgent.Score >= 50 ? "text-warning" : "text-danger")">
+                                                        @multiAgent.CulturalAgent.Score%
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                @* Orchestrator Summary *@
+                                @if (!string.IsNullOrWhiteSpace(multiAgent.OrchestratorSummary))
+                                {
+                                    <div class="alert @(multiAgent.Recommendation == "Approve" ? "alert-success" : multiAgent.Recommendation == "NeedsReview" ? "alert-warning" : "alert-danger") mb-3">
+                                        <strong><i class="bi bi-lightbulb"></i> Orchestrator Summary:</strong>
+                                        <p class="mb-0 mt-1 small">@multiAgent.OrchestratorSummary</p>
+                                    </div>
+                                }
+
+                                @* Agent Details Accordion *@
+                                <div class="accordion mb-3" id="agentDetailsAccordion">
+                                    @if (multiAgent.TranslationAgent != null)
+                                    {
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed py-2" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#translationAgentDetails">
+                                                    <span class="me-2">📝</span> Translation Agent Details
+                                                    <span class="badge @(multiAgent.TranslationAgent.Score >= 80 ? "bg-success" : multiAgent.TranslationAgent.Score >= 50 ? "bg-warning" : "bg-danger") ms-2">
+                                                        @multiAgent.TranslationAgent.Score%
+                                                    </span>
+                                                </button>
+                                            </h2>
+                                            <div id="translationAgentDetails" class="accordion-collapse collapse" data-bs-parent="#agentDetailsAccordion">
+                                                <div class="accordion-body small">
+                                                    <p>@multiAgent.TranslationAgent.Reasoning</p>
+                                                    @if (multiAgent.TranslationAgent.Issues?.Any() == true)
+                                                    {
+                                                        <strong>Issues:</strong>
+                                                        <ul class="mb-0">
+                                                            @foreach (var issue in multiAgent.TranslationAgent.Issues.Take(5))
+                                                            {
+                                                                <li>
+                                                                    <span class="badge @GetMultiAgentSeverityClass(issue.Severity) me-1">@issue.Severity</span>
+                                                                    @issue.Description
+                                                                    @if (!string.IsNullOrEmpty(issue.Suggestion))
+                                                                    {
+                                                                        <br/><small class="text-success"><i class="bi bi-lightbulb"></i> @issue.Suggestion</small>
+                                                                    }
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (multiAgent.TechnicalAgent != null)
+                                    {
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed py-2" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#technicalAgentDetails">
+                                                    <span class="me-2">⚙️</span> Technical Agent Details
+                                                    <span class="badge @(multiAgent.TechnicalAgent.Score >= 80 ? "bg-success" : multiAgent.TechnicalAgent.Score >= 50 ? "bg-warning" : "bg-danger") ms-2">
+                                                        @multiAgent.TechnicalAgent.Score%
+                                                    </span>
+                                                </button>
+                                            </h2>
+                                            <div id="technicalAgentDetails" class="accordion-collapse collapse" data-bs-parent="#agentDetailsAccordion">
+                                                <div class="accordion-body small">
+                                                    <p>@multiAgent.TechnicalAgent.Reasoning</p>
+                                                    @if (multiAgent.TechnicalAgent.Issues?.Any() == true)
+                                                    {
+                                                        <strong>Issues:</strong>
+                                                        <ul class="mb-0">
+                                                            @foreach (var issue in multiAgent.TechnicalAgent.Issues.Take(5))
+                                                            {
+                                                                <li>
+                                                                    <span class="badge @GetMultiAgentSeverityClass(issue.Severity) me-1">@issue.Severity</span>
+                                                                    @issue.Description
+                                                                    @if (!string.IsNullOrEmpty(issue.Suggestion))
+                                                                    {
+                                                                        <br/><small class="text-success"><i class="bi bi-lightbulb"></i> @issue.Suggestion</small>
+                                                                    }
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (multiAgent.CulturalAgent != null)
+                                    {
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed py-2" type="button" 
+                                                        data-bs-toggle="collapse" data-bs-target="#culturalAgentDetails">
+                                                    <span class="me-2">🌍</span> Cultural Agent Details
+                                                    <span class="badge @(multiAgent.CulturalAgent.Score >= 80 ? "bg-success" : multiAgent.CulturalAgent.Score >= 50 ? "bg-warning" : "bg-danger") ms-2">
+                                                        @multiAgent.CulturalAgent.Score%
+                                                    </span>
+                                                </button>
+                                            </h2>
+                                            <div id="culturalAgentDetails" class="accordion-collapse collapse" data-bs-parent="#agentDetailsAccordion">
+                                                <div class="accordion-body small">
+                                                    <p>@multiAgent.CulturalAgent.Reasoning</p>
+                                                    @if (multiAgent.CulturalAgent.Issues?.Any() == true)
+                                                    {
+                                                        <strong>Issues:</strong>
+                                                        <ul class="mb-0">
+                                                            @foreach (var issue in multiAgent.CulturalAgent.Issues.Take(5))
+                                                            {
+                                                                <li>
+                                                                    <span class="badge @GetMultiAgentSeverityClass(issue.Severity) me-1">@issue.Severity</span>
+                                                                    @issue.Description
+                                                                    @if (!string.IsNullOrEmpty(issue.Suggestion))
+                                                                    {
+                                                                        <br/><small class="text-success"><i class="bi bi-lightbulb"></i> @issue.Suggestion</small>
+                                                                    }
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                             else if (CurrentValidationResult != null)
                             {
+                                @* Legacy Single-Agent Validation Display *@
                                 @* Overall Score *@
                                 <div class="mb-4">
                                     <div class="d-flex justify-content-between mb-1">
@@ -302,13 +504,97 @@
                             }
                             else
                             {
-                                <p class="text-muted mb-3">Use AI to analyze translation quality</p>
+                                <p class="text-muted mb-3">Use AI agents to analyze translation quality</p>
                                 <button class="btn btn-primary w-100" @onclick="ValidateSubtitles">
                                     <i class="bi bi-robot"></i> Analyze Translation Quality
                                 </button>
                             }
                         </div>
                     </div>
+
+                    @* AI Chat Panel - Interactive conversation with validation agents *@
+                    @if (HasChatCapability)
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-chat-dots"></i> Ask the AI Agents
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                @* Agent Selector (for multi-agent) *@
+                                @if (job.HasMultiAgentValidation)
+                                {
+                                    <div class="mb-3">
+                                        <label class="form-label small text-muted">Select Agent to Chat With:</label>
+                                        <select class="form-select" @bind="selectedAgentType">
+                                            <option value="Orchestrator">🎯 Orchestrator (General Questions)</option>
+                                            <option value="Translation">📝 Translation Agent</option>
+                                            <option value="Technical">⚙️ Technical Agent</option>
+                                            <option value="Cultural">🌍 Cultural Agent</option>
+                                        </select>
+                                    </div>
+                                }
+
+                                @* Chat History *@
+                                <div class="chat-history border rounded p-3 mb-3" style="max-height: 300px; overflow-y: auto;" @ref="chatHistoryElement">
+                                    @if (loadingChatHistory)
+                                    {
+                                        <div class="text-center">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (chatMessages.Count == 0)
+                                    {
+                                        <p class="text-muted text-center mb-0">
+                                            <i class="bi bi-chat-left-text"></i> Ask questions about the translation quality
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var msg in chatMessages)
+                                        {
+                                            <div class="mb-2 @(msg.Role == "user" ? "text-end" : "")">
+                                                <div class="d-inline-block p-2 rounded @(msg.Role == "user" ? "bg-primary text-white" : "bg-light")" 
+                                                     style="max-width: 80%;">
+                                                    <small class="d-block text-@(msg.Role == "user" ? "white-50" : "muted") mb-1">
+                                                        @(msg.Role == "user" ? "You" : GetAgentDisplayName(msg.AgentType))
+                                                    </small>
+                                                    <div style="white-space: pre-wrap;">@msg.Content</div>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                                
+                                @* Chat Input *@
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Ask about the translation..."
+                                           @bind="chatMessage" @bind:event="oninput"
+                                           @onkeypress="HandleChatKeyPress"
+                                           disabled="@sendingChat" />
+                                    <button class="btn btn-primary" @onclick="SendChatMessage" disabled="@(sendingChat || string.IsNullOrWhiteSpace(chatMessage))">
+                                        @if (sendingChat)
+                                        {
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send"></i>
+                                        }
+                                    </button>
+                                </div>
+                                @if (!string.IsNullOrEmpty(chatError))
+                                {
+                                    <div class="alert alert-danger mt-2 mb-0 py-1 px-2 small">
+                                        @chatError
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 }
             </div>
 
@@ -472,8 +758,24 @@
     private bool validating = false;
     private string? validationError;
 
+    // Chat state
+    private List<ConversationMessage> chatMessages = new();
+    private string chatMessage = string.Empty;
+    private bool sendingChat = false;
+    private bool loadingChatHistory = false;
+    private string? chatError;
+    private ElementReference chatHistoryElement;
+    
+    // Multi-agent chat state
+    private string selectedAgentType = "Orchestrator";
+
     // Use validation result from API if available, otherwise use locally fetched one
     private SubtitleValidationResult? CurrentValidationResult => job?.ValidationResult ?? validationResult;
+
+    // Check if chat is available (either single-agent or multi-agent)
+    private bool HasChatCapability => 
+        !string.IsNullOrEmpty(job?.ValidationThreadId) || 
+        job?.HasMultiAgentValidation == true;
 
     private bool IsProcessing => job?.Status != null && 
         !job.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) &&
@@ -482,9 +784,61 @@
         !job.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase) &&
         !job.Status.Equals("PendingApproval", StringComparison.OrdinalIgnoreCase);
 
+    // Helper method for validation card border color
+    private string GetValidationCardBorderClass()
+    {
+        if (job?.HasMultiAgentValidation == true && job.MultiAgentValidation != null)
+        {
+            return job.MultiAgentValidation.Recommendation switch
+            {
+                "Approve" => "border-success",
+                "NeedsReview" => "border-warning",
+                "Reject" => "border-danger",
+                _ => ""
+            };
+        }
+        if (CurrentValidationResult != null)
+        {
+            return CurrentValidationResult.IsValid ? "border-success" : "border-warning";
+        }
+        return "";
+    }
+
+    // Helper method for multi-agent severity badge class
+    private static string GetMultiAgentSeverityClass(string? severity)
+    {
+        return severity?.ToLower() switch
+        {
+            "critical" => "bg-danger",
+            "high" => "bg-warning text-dark",
+            "medium" => "bg-info",
+            "low" => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+
+    // Helper method to get agent display name with icon
+    private string GetAgentDisplayName(string? agentType)
+    {
+        return agentType switch
+        {
+            "Orchestrator" => "🎯 Orchestrator",
+            "Translation" => "📝 Translation Agent",
+            "Technical" => "⚙️ Technical Agent",
+            "Cultural" => "🌍 Cultural Agent",
+            _ => "AI Agent"
+        };
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadJob();
+        
+        // Load chat history if chat capability exists (single-agent or multi-agent)
+        if (HasChatCapability)
+        {
+            await LoadChatHistory();
+        }
         
         // Auto-start refresh if processing
         if (IsProcessing)
@@ -688,6 +1042,96 @@
         {
             isApproving = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task LoadChatHistory()
+    {
+        // Skip if no chat capability
+        if (!HasChatCapability) return;
+
+        loadingChatHistory = true;
+        chatError = null;
+
+        try
+        {
+            // For multi-agent, pass the selected agent type
+            var agentType = job?.HasMultiAgentValidation == true ? selectedAgentType : null;
+            var history = await ApiService.GetChatHistoryAsync(JobId, agentType);
+            if (history?.Messages != null)
+            {
+                chatMessages = history.Messages;
+            }
+        }
+        catch (Exception ex)
+        {
+            chatError = $"Failed to load chat history: {ex.Message}";
+        }
+        finally
+        {
+            loadingChatHistory = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage)) return;
+
+        sendingChat = true;
+        chatError = null;
+        var messageToSend = chatMessage;
+        chatMessage = string.Empty;
+        
+        // Determine agent type for multi-agent systems
+        var agentType = job?.HasMultiAgentValidation == true ? selectedAgentType : null;
+
+        // Add user message immediately for responsiveness
+        chatMessages.Add(new ConversationMessage
+        {
+            Role = "user",
+            Content = messageToSend,
+            Timestamp = DateTime.UtcNow,
+            AgentType = agentType
+        });
+        StateHasChanged();
+
+        try
+        {
+            var response = await ApiService.SendChatMessageAsync(JobId, messageToSend, agentType);
+            if (response != null && !string.IsNullOrEmpty(response.Message))
+            {
+                chatMessages.Add(new ConversationMessage
+                {
+                    Role = "assistant",
+                    Content = response.Message,
+                    Timestamp = response.Timestamp,
+                    AgentType = agentType
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            chatError = $"Failed to send message: {ex.Message}";
+            // Remove the user message if sending failed
+            if (chatMessages.Count > 0 && chatMessages[^1].Role == "user")
+            {
+                chatMessages.RemoveAt(chatMessages.Count - 1);
+            }
+            chatMessage = messageToSend; // Restore the message
+        }
+        finally
+        {
+            sendingChat = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleChatKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !sendingChat && !string.IsNullOrWhiteSpace(chatMessage))
+        {
+            await SendChatMessage();
         }
     }
 

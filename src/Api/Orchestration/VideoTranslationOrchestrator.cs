@@ -136,12 +136,12 @@ public static class VideoTranslationOrchestrator
                     break;
                 }
 
-                // Check timeout for translation (5 minutes should be enough)
+                // Check timeout for translation (15 minutes for longer videos)
                 var translationElapsed = context.CurrentUtcDateTime - translationStartTime;
-                if (translationElapsed > TimeSpan.FromMinutes(5))
+                if (translationElapsed > TimeSpan.FromMinutes(15))
                 {
                     job.Status = JobStatus.Failed;
-                    job.Error = "Translation operation timed out after 5 minutes";
+                    job.Error = "Translation operation timed out after 15 minutes";
                     job.StatusMessage = "Translation operation timeout";
                     job.LastUpdatedAt = context.CurrentUtcDateTime;
                     return job;
@@ -300,18 +300,44 @@ public static class VideoTranslationOrchestrator
                     SourceSubtitleUrl = sourceSubtitleUrl,
                     TargetSubtitleUrl = targetSubtitleUrl,
                     SourceLanguage = job.Request.SourceLocale,
-                    TargetLanguage = job.Request.TargetLocale
+                    TargetLanguage = job.Request.TargetLocale,
+                    Job = job  // Pass full job for Foundry Agent Service context
                 },
                 CreateRetryOptions());
 
             if (subtitleValidation.Success && subtitleValidation.ValidationResult != null)
             {
                 job.ValidationResult = subtitleValidation.ValidationResult;
+                
+                // Store thread ID for interactive chat (if using Foundry Agent Service)
+                if (!string.IsNullOrEmpty(subtitleValidation.ThreadId))
+                {
+                    job.ValidationThreadId = subtitleValidation.ThreadId;
+                    logger.LogInformation("Job {JobId}: Foundry thread created: {ThreadId}", 
+                        job.JobId, subtitleValidation.ThreadId);
+                }
+                
                 logger.LogInformation(
                     "Job {JobId}: Validation complete. Score={Score}, Valid={IsValid}",
                     job.JobId,
                     subtitleValidation.ValidationResult.ConfidenceScore,
                     subtitleValidation.ValidationResult.IsValid);
+            }
+            else if (subtitleValidation.Success && subtitleValidation.MultiAgentResult != null)
+            {
+                // Multi-Agent validation result (4 specialist agents)
+                job.MultiAgentValidation = subtitleValidation.MultiAgentResult;
+                
+                // Also set legacy fields for backward compatibility
+                job.ValidationThreadId = subtitleValidation.MultiAgentResult.OrchestratorThreadId;
+                
+                logger.LogInformation(
+                    "Job {JobId}: Multi-agent validation complete. " +
+                    "Overall={Overall:F1}, Recommendation={Rec}, Issues={Issues}",
+                    job.JobId,
+                    subtitleValidation.MultiAgentResult.OverallScore,
+                    subtitleValidation.MultiAgentResult.Recommendation,
+                    subtitleValidation.MultiAgentResult.AllIssues?.Count ?? 0);
             }
             else
             {

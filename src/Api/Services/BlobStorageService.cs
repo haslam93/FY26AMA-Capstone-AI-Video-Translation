@@ -170,6 +170,20 @@ public class BlobStorageService : IBlobStorageService
         return await blobClient.ExistsAsync(cancellationToken);
     }
 
+    public async Task<string> ReadAsStringAsync(
+        string containerName,
+        string blobPath,
+        CancellationToken cancellationToken = default)
+    {
+        _logger?.LogInformation("Reading content from {Container}/{BlobPath}", containerName, blobPath);
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(blobPath);
+        
+        var response = await blobClient.DownloadContentAsync(cancellationToken);
+        return response.Value.Content.ToString();
+    }
+
     public async Task DeleteAsync(
         string containerName,
         string blobPath,

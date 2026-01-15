@@ -23,7 +23,8 @@ The Video Translation Service uses the following Azure resources, all deployed v
 | **Storage Account** | Video files, outputs, subtitles, and Durable Functions state | Standard_LRS |
 | **Key Vault** | Secrets management (RBAC enabled) | Standard |
 | **Speech Services** | Video Translation API (with custom subdomain) | S0 (Standard) |
-| **AI Services** | Cognitive Services for translation | S0 (Standard) |
+| **AI Services** | `AIServices-AMA-{N}` | S0 (Standard) |
+| **Multi-Agent System** | 4 agents (Orchestrator, Translation, Technical, Cultural) | GPT-4o-mini |
 | **Static Web App** | Blazor WebAssembly UI hosting | Free |
 | **App Service Plan** | Hosting plan for Function App | S1 (Standard) |
 | **Function App** | Durable Functions API backend | .NET 8 Isolated |
@@ -331,7 +332,38 @@ Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/jobs/{jobI
 **Solution**: Verify AI Foundry settings:
 ```powershell
 # Check Function App settings
-az functionapp config appsettings list --name FuncApp-AMA-{N} --resource-group AMAFY26-deployment-{N} --query "[?starts_with(name, 'AIFoundry')]"
+az functionapp config appsettings list --name FuncApp-AMA-{N} --resource-group AMAFY26-deployment-{N} --query "[?starts_with(name, 'FoundryAgent')]"
+
+# Required settings:
+# - FoundryAgent__Endpoint
+# - FoundryAgent__ModelDeploymentName
+# - FoundryAgent__ProjectName (optional)
+```
+
+#### 6. Multi-Agent Validation Returns Low Scores
+
+**Cause**: Agents are correctly identifying quality issues.
+
+**Solution**: 
+- Review individual agent feedback in UI Job Details page
+- Use agent chat to get more detailed feedback from specific agents
+- Check if subtitles have formatting or timing issues
+- Verify source video quality is adequate for translation
+
+```powershell
+# Test multi-agent validation endpoint directly
+$body = @{sourceVtt = "..."; targetVtt = "..."; sourceLocale = "en-US"; targetLocale = "es-ES"} | ConvertTo-Json
+Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/jobs/{jobId}/validate" -Method POST -ContentType "application/json" -Body $body
+```
+
+#### 7. Agent Chat Not Working
+
+**Cause**: Thread ID not persisted or agent service unavailable.
+
+**Solution**:
+```powershell
+# Check agent chat history endpoint
+Invoke-RestMethod -Uri "https://funcapp-ama-{N}.azurewebsites.net/api/jobs/{jobId}/chat?agentType=Translation" -Method GET
 ```
 
 **Solution**: Wait 5-10 minutes for Azure RBAC propagation, or verify the role assignment:

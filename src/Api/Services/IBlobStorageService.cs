@@ -55,6 +55,17 @@ public interface IBlobStorageService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads the content of a blob as a string.
+    /// </summary>
+    /// <param name="containerName">Container name.</param>
+    /// <param name="blobPath">Blob path.</param>
+    /// <returns>Content of the blob as a string.</returns>
+    Task<string> ReadAsStringAsync(
+        string containerName,
+        string blobPath,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes a blob if it exists.
     /// </summary>
     Task DeleteAsync(

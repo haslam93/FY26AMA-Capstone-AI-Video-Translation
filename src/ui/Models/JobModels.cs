@@ -54,7 +54,19 @@ public class JobStatusResponse
     public DateTime LastUpdatedAt { get; set; }
     public JobResultDto? Result { get; set; }
     public SubtitleValidationResult? ValidationResult { get; set; }
+    public string? ValidationThreadId { get; set; }
+    
+    /// <summary>
+    /// Multi-agent validation result with per-agent scores.
+    /// </summary>
+    public MultiAgentValidationResult? MultiAgentValidation { get; set; }
+    
     public string? Error { get; set; }
+    
+    /// <summary>
+    /// Checks if this job has multi-agent validation results.
+    /// </summary>
+    public bool HasMultiAgentValidation => MultiAgentValidation != null;
 }
 
 /// <summary>
@@ -217,3 +229,285 @@ public class ApprovalDecision
     public string? Reason { get; set; }
     public string? Comments { get; set; }
 }
+
+/// <summary>
+/// Request to send a chat message to the validation agent.
+/// </summary>
+public class ChatRequest
+{
+    /// <summary>
+    /// The message to send to the agent.
+    /// </summary>
+    public string? Message { get; set; }
+    
+    /// <summary>
+    /// The type of agent to route the message to.
+    /// Values: "orchestrator" (default), "translation", "technical", "cultural"
+    /// </summary>
+    public string? AgentType { get; set; }
+}
+
+/// <summary>
+/// Response from the validation agent chat.
+/// </summary>
+public class ChatResponse
+{
+    public string? Message { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
+/// <summary>
+/// Conversation history response.
+/// </summary>
+public class ChatHistoryResponse
+{
+    public List<ConversationMessage> Messages { get; set; } = new();
+    public string? ThreadId { get; set; }
+}
+
+/// <summary>
+/// A message in the conversation.
+/// </summary>
+public class ConversationMessage
+{
+    public string Role { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+    
+    /// <summary>
+    /// The type of agent that sent/received this message (for multi-agent systems).
+    /// Values: "Orchestrator", "Translation", "Technical", "Cultural", or null for single-agent.
+    /// </summary>
+    public string? AgentType { get; set; }
+}
+
+#region Multi-Agent Validation Models
+
+/// <summary>
+/// Result from the multi-agent validation pipeline.
+/// Contains aggregated results from all specialist agents.
+/// </summary>
+public class MultiAgentValidationResult
+{
+    /// <summary>
+    /// Whether the validation passed overall.
+    /// </summary>
+    public bool IsValid { get; set; }
+
+    /// <summary>
+    /// Weighted average score from all agents (0-100).
+    /// Weights: Translation 40%, Technical 30%, Cultural 30%
+    /// </summary>
+    public double OverallScore { get; set; }
+
+    /// <summary>
+    /// Final recommendation: "Approve", "NeedsReview", or "Reject"
+    /// </summary>
+    public string Recommendation { get; set; } = "NeedsReview";
+
+    /// <summary>
+    /// Human-readable summary from the orchestrator agent.
+    /// </summary>
+    public string Summary { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Results from the Translation Review Agent.
+    /// </summary>
+    public AgentReviewResult? TranslationReview { get; set; }
+
+    /// <summary>
+    /// Results from the Technical Review Agent.
+    /// </summary>
+    public AgentReviewResult? TechnicalReview { get; set; }
+
+    /// <summary>
+    /// Results from the Cultural Review Agent.
+    /// </summary>
+    public AgentReviewResult? CulturalReview { get; set; }
+
+    /// <summary>
+    /// Thread ID for the Orchestrator Agent (for follow-up chat).
+    /// </summary>
+    public string? OrchestratorThreadId { get; set; }
+
+    /// <summary>
+    /// Thread ID for the Translation Review Agent.
+    /// </summary>
+    public string? TranslationAgentThreadId { get; set; }
+
+    /// <summary>
+    /// Thread ID for the Technical Review Agent.
+    /// </summary>
+    public string? TechnicalAgentThreadId { get; set; }
+
+    /// <summary>
+    /// Thread ID for the Cultural Review Agent.
+    /// </summary>
+    public string? CulturalAgentThreadId { get; set; }
+
+    /// <summary>
+    /// All issues found by all agents.
+    /// </summary>
+    public List<MultiAgentIssue> AllIssues { get; set; } = new();
+
+    /// <summary>
+    /// When the validation was completed.
+    /// </summary>
+    public DateTime ValidatedAt { get; set; }
+
+    // Convenience alias properties for easier Razor binding
+    public AgentReviewResult? TranslationAgent => TranslationReview;
+    public AgentReviewResult? TechnicalAgent => TechnicalReview;
+    public AgentReviewResult? CulturalAgent => CulturalReview;
+    public string? OrchestratorSummary => Summary;
+
+    /// <summary>
+    /// Gets the recommendation badge color class.
+    /// </summary>
+    public string RecommendationBadgeClass => Recommendation switch
+    {
+        "Approve" => "bg-success",
+        "NeedsReview" => "bg-warning text-dark",
+        "Reject" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    /// <summary>
+    /// Gets the overall score color class.
+    /// </summary>
+    public string ScoreColorClass => OverallScore switch
+    {
+        >= 80 => "text-success",
+        >= 50 => "text-warning",
+        _ => "text-danger"
+    };
+
+    /// <summary>
+    /// Gets the recommendation icon.
+    /// </summary>
+    public string RecommendationIcon => Recommendation switch
+    {
+        "Approve" => "✅",
+        "NeedsReview" => "⚠️",
+        "Reject" => "❌",
+        _ => "❓"
+    };
+}
+
+/// <summary>
+/// Result from a single specialist agent's review.
+/// </summary>
+public class AgentReviewResult
+{
+    /// <summary>
+    /// Name of the agent.
+    /// </summary>
+    public string AgentName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Type: "translation", "technical", "cultural"
+    /// </summary>
+    public string AgentType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Score assigned by this agent (0-100).
+    /// </summary>
+    public double Score { get; set; }
+
+    /// <summary>
+    /// Detailed reasoning for the score.
+    /// </summary>
+    public string Reasoning { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Issues found by this agent.
+    /// </summary>
+    public List<MultiAgentIssue> Issues { get; set; } = new();
+
+    /// <summary>
+    /// When this review was completed.
+    /// </summary>
+    public DateTime ReviewedAt { get; set; }
+
+    /// <summary>
+    /// Thread ID for follow-up chat with this agent.
+    /// </summary>
+    public string? ThreadId { get; set; }
+
+    /// <summary>
+    /// Gets the score color class for display.
+    /// </summary>
+    public string ScoreColorClass => Score switch
+    {
+        >= 80 => "text-success",
+        >= 50 => "text-warning",
+        _ => "text-danger"
+    };
+
+    /// <summary>
+    /// Gets the icon for this agent type.
+    /// </summary>
+    public string AgentIcon => AgentType switch
+    {
+        "translation" => "📝",
+        "technical" => "⚙️",
+        "cultural" => "🌍",
+        _ => "🤖"
+    };
+}
+
+/// <summary>
+/// A specific issue found by a multi-agent validator.
+/// </summary>
+public class MultiAgentIssue
+{
+    /// <summary>
+    /// Severity: "critical", "major", "minor", "suggestion"
+    /// </summary>
+    public string Severity { get; set; } = "minor";
+
+    /// <summary>
+    /// Category/source: "translation", "technical", "cultural"
+    /// </summary>
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Description of the issue.
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Location in the subtitle file.
+    /// </summary>
+    public string? Location { get; set; }
+
+    /// <summary>
+    /// Suggested fix.
+    /// </summary>
+    public string? Suggestion { get; set; }
+
+    /// <summary>
+    /// Gets the severity badge class.
+    /// </summary>
+    public string SeverityBadgeClass => Severity?.ToLower() switch
+    {
+        "critical" => "badge-danger",
+        "major" => "badge-warning",
+        "minor" => "badge-info",
+        "suggestion" => "badge-secondary",
+        _ => "badge-secondary"
+    };
+
+    /// <summary>
+    /// Gets the category icon.
+    /// </summary>
+    public string CategoryIcon => Category?.ToLower() switch
+    {
+        "translation" => "📝",
+        "technical" => "⚙️",
+        "cultural" => "🌍",
+        _ => "❓"
+    };
+}
+
+#endregion

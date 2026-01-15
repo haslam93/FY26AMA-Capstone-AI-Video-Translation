@@ -63,8 +63,11 @@ graph TB
             A6[RunValidationActivity]
         end
         
-        subgraph "Agents"
-            Agent[SubtitleValidationAgent]
+        subgraph "Multi-Agent System"
+            ORCH_AGENT[Orchestrator Agent<br/>Coordinates & Aggregates]
+            TRANS_AGENT[Translation Agent<br/>40% Weight]
+            TECH_AGENT[Technical Agent<br/>30% Weight]
+            CULT_AGENT[Cultural Agent<br/>30% Weight]
         end
     end
 
@@ -89,8 +92,13 @@ graph TB
     Orch --> A4
     Orch --> A5
     Orch --> A6
-    A6 --> Agent
-    Agent --> AI
+    A6 --> ORCH_AGENT
+    ORCH_AGENT --> TRANS_AGENT
+    ORCH_AGENT --> TECH_AGENT
+    ORCH_AGENT --> CULT_AGENT
+    TRANS_AGENT --> AI
+    TECH_AGENT --> AI
+    CULT_AGENT --> AI
     
     A1 --> Storage
     A2 --> Speech
@@ -256,24 +264,62 @@ graph LR
 | `CopyOutputsActivity` | `CopyOutputsActivity.cs` | Copy translated video/subtitles from Speech API URLs to your storage |
 | `RunValidationActivity` | `RunValidationActivity.cs` | Run AI-powered subtitle validation using GPT-4o-mini |
 
-### 5. AI Agents (`src/api/Agents/`)
+### 5. Multi-Agent Validation System (`src/api/Services/`)
 
-**Purpose**: AI-powered agents for intelligent processing.
+**Purpose**: AI-powered multi-agent system for comprehensive subtitle quality validation.
 
-| Agent | File | Responsibility |
-|-------|------|----------------|
-| `SubtitleValidationAgent` | `SubtitleValidationAgent.cs` | Analyzes subtitle quality using GPT-4o-mini |
-| `VttParsingService` | `VttParsingService.cs` | Parses WebVTT files for validation |
-| `AgentConfigurationService` | `AgentConfigurationService.cs` | Azure AI Foundry connection management |
+**Architecture**: 4 specialized agents running in **parallel** for optimal performance.
 
-**Validation Categories**:
-| Category | Weight | Description |
-|----------|--------|-------------|
-| Translation Accuracy | 35% | Semantic accuracy of translation |
-| Grammar | 20% | Grammar and spelling in target language |
-| Timing | 20% | Subtitle synchronization |
-| Cultural Context | 15% | Idiom and cultural adaptation |
-| Formatting | 10% | Line length and readability |
+```mermaid
+graph TB
+    subgraph "Multi-Agent Orchestration"
+        Input[Subtitles Input] --> ORCH[Orchestrator Agent]
+        ORCH --> |Parallel Execution| TRANS[Translation Agent]
+        ORCH --> |Parallel Execution| TECH[Technical Agent]
+        ORCH --> |Parallel Execution| CULT[Cultural Agent]
+        TRANS --> AGG[Score Aggregation]
+        TECH --> AGG
+        CULT --> AGG
+        AGG --> |Weighted Score| Output[Final Result]
+    end
+```
+
+| Agent | Weight | Responsibility |
+|-------|--------|----------------|
+| **Orchestrator Agent** | - | Coordinates workflow, aggregates scores, provides summary |
+| **Translation Agent** | 40% | Semantic accuracy, meaning preservation, natural phrasing |
+| **Technical Agent** | 30% | Timing sync, CPS rate, formatting compliance |
+| **Cultural Agent** | 30% | Cultural adaptation, idioms, regional appropriateness |
+
+**Services & Files**:
+| Service | File | Purpose |
+|---------|------|---------||
+| `IMultiAgentValidationService` | `Services/IMultiAgentValidationService.cs` | Interface for multi-agent validation |
+| `MultiAgentValidationService` | `Services/MultiAgentValidationService.cs` | 4-agent parallel validation implementation |
+| `FoundryAgentService` | `Services/FoundryAgentService.cs` | Azure AI Foundry Agent SDK integration |
+| `MultiAgentValidationResult` | `Models/MultiAgentValidationResult.cs` | Result models with weighted scoring |
+
+**Score Thresholds**:
+| Score Range | Recommendation | Action |
+|-------------|----------------|--------|
+| ≥ 80 | **Approve** | Auto-proceed to approval |
+| 50-79 | **NeedsReview** | Human review recommended |
+| < 50 | **Reject** | Translation quality insufficient |
+
+**Per-Agent Model Configuration**:
+```json
+{
+  "FoundryAgent": {
+    "ModelDeploymentName": "gpt-4o-mini",
+    "AgentModels": {
+      "Orchestrator": "gpt-4o",
+      "Translation": "gpt-4o-mini",
+      "Technical": "gpt-4o-mini",
+      "Cultural": "gpt-4o-mini"
+    }
+  }
+}
+```
 
 ### 6. Services (`src/api/Services/`)
 
@@ -348,11 +394,30 @@ classDiagram
         +ValidationCategoryScores CategoryScores
     }
     
+    class MultiAgentValidationResult {
+        +double OverallScore
+        +string Recommendation
+        +AgentReviewResult TranslationReview
+        +AgentReviewResult TechnicalReview
+        +AgentReviewResult CulturalReview
+        +string OrchestratorSummary
+        +DateTime ValidatedAt
+    }
+    
+    class AgentReviewResult {
+        +string AgentType
+        +double Score
+        +string Reasoning
+        +List~MultiAgentIssue~ Issues
+        +string ThreadId
+    }
+    
     TranslationJob --> TranslationJobRequest
     TranslationJob --> JobStatus
     TranslationJob --> JobResult
     TranslationJob --> ApprovalDecision
     TranslationJob --> SubtitleValidationResult
+    TranslationJob --> MultiAgentValidationResult
 ```
 
 | Model | Location | Purpose |
@@ -362,7 +427,10 @@ classDiagram
 | `JobStatusResponse` | `Models/JobStatusResponse.cs` | API response DTO |
 | `IterateRequest` | `Models/IterateRequest.cs` | Request for new iteration |
 | `ApprovalDecision` | `Models/TranslationJob.cs` | Human approval/rejection decision |
-| `SubtitleValidationResult` | `Models/TranslationWorkflowState.cs` | AI validation result with scores |
+| `SubtitleValidationResult` | `Models/TranslationWorkflowState.cs` | Single-agent validation result |
+| `MultiAgentValidationResult` | `Models/MultiAgentValidationResult.cs` | Multi-agent validation with weighted scoring |
+| `AgentReviewResult` | `Models/MultiAgentValidationResult.cs` | Per-agent review result |
+| `MultiAgentIssue` | `Models/MultiAgentValidationResult.cs` | Validation issue from agents |
 | Speech API Models | `Models/SpeechApi/*.cs` | Request/response types for Speech API |
 
 ---
@@ -836,32 +904,44 @@ graph TB
 
 **User Principal ID**: `716e5244-7a36-4bef-9fe6-18f8b62f3cce`
 
-### Multi-Agent Architecture (Planned)
+### Multi-Agent Architecture (Implemented)
 
-The system is being enhanced with a multi-agent architecture for improved subtitle quality:
+The system uses a **multi-agent architecture** for comprehensive subtitle quality validation with 4 specialized agents running in **parallel**:
 
 ```mermaid
 graph TB
-    subgraph "Multi-Agent Workflow"
-        SUP[Supervisor Agent<br/>Coordinates workflow]
-        TRANS[Translation Executor<br/>Wraps Speech API]
-        VAL[Validation Agent<br/>GPT-4o-mini]
-        HUMAN[Human-in-the-Loop<br/>Final approval]
+    subgraph "Multi-Agent Validation System"
+        SUP[Orchestrator Agent<br/>Coordinates & Summarizes]
+        TRANS[Translation Agent<br/>Semantic Accuracy - 40%]
+        TECH[Technical Agent<br/>Timing & Format - 30%]
+        CULT[Cultural Agent<br/>Localization - 30%]
+        HUMAN[Human-in-the-Loop<br/>Final Approval]
     end
     
-    SUP --> TRANS
-    SUP --> VAL
-    SUP --> HUMAN
-    VAL -->|Quality Score| SUP
+    SUP -->|Parallel| TRANS
+    SUP -->|Parallel| TECH
+    SUP -->|Parallel| CULT
+    TRANS -->|Score| SUP
+    TECH -->|Score| SUP
+    CULT -->|Score| SUP
+    SUP -->|Weighted Score| HUMAN
     HUMAN -->|Approve/Reject| SUP
 ```
 
-| Agent | Model | Purpose |
-|-------|-------|---------|
-| **Supervisor** | - | Coordinates workflow, routes tasks |
-| **Translation Executor** | Speech API | Wraps existing translation logic |
-| **Validation Agent** | GPT-4o-mini | Validates subtitle quality, timing |
-| **Human-in-the-Loop** | - | Final review and approval |
+| Agent | Model | Weight | Purpose |
+|-------|-------|--------|---------|
+| **Orchestrator** | GPT-4o-mini | - | Coordinates workflow, aggregates scores, provides summary |
+| **Translation Agent** | GPT-4o-mini | 40% | Semantic accuracy, meaning preservation, fluency |
+| **Technical Agent** | GPT-4o-mini | 30% | Timing sync, CPS, line length, WebVTT format |
+| **Cultural Agent** | GPT-4o-mini | 30% | Cultural adaptation, idioms, appropriateness |
+| **Human-in-the-Loop** | - | - | Final review and approval (3-day timeout) |
+
+**Score Thresholds**:
+| Score | Recommendation | Action |
+|-------|----------------|--------|
+| ≥ 80 | Approve | Translation meets quality standards |
+| 50-79 | NeedsReview | Human review recommended |
+| < 50 | Reject | Translation quality insufficient |
 
 ### Key Security Features
 
@@ -941,3 +1021,35 @@ graph TB
 3. **Implement circuit breakers** for external service calls
 4. **Use CDN** for output file distribution
 5. **Consider regional redundancy** for high availability
+
+---
+
+## Future Enhancements
+
+### Network Isolation Options
+
+For production environments requiring enhanced network security, consider these options:
+
+| Option | Complexity | Estimated Effort | Description |
+|--------|------------|------------------|-------------|
+| **Hybrid (Recommended)** | Medium | ~6 hours | Private endpoints for Storage, Speech, AI Foundry; Function App public with auth |
+| **API Management Gateway** | High | 1-2 days | Full private network with APIM as single entry point |
+| **App Service Replacement** | Medium | 1 day | Replace SWA with App Service for VNet integration |
+| **Front Door + Private Link** | High | 1-2 days | CDN + WAF with private backend connectivity |
+
+**Recommended Approach (Hybrid):**
+- Static Web Apps cannot connect to Function Apps via private endpoints (SWA limitation)
+- Function App uses VNet Integration to reach private services
+- All backend services (Storage, Speech, AI Foundry) accessible only via private endpoints
+- DNS zones required for each private endpoint
+
+### Additional Enhancements
+
+| Enhancement | Priority | Description |
+|-------------|----------|-------------|
+| Agent Consensus Visualization | Medium | Show agreement/disagreement between agents |
+| PDF Export | Low | Export validation reports as PDF |
+| Agent Performance Dashboard | Medium | Track agent response times and accuracy |
+| Webhook Notifications | Medium | Notify external systems on job completion |
+| Cost Tracking | Low | Track Azure AI Foundry token usage per job |
+| Re-Validation After Edit | High | Re-run validation when subtitles are manually edited |

@@ -40,8 +40,10 @@ A cloud-native video translation service built on Azure that automatically trans
 | **Subtitle Generation** | Automatic WebVTT subtitle creation |
 | **Burned-in Subtitles** | Option to embed subtitles in output video |
 | **Job Dashboard** | Track all translation jobs with status updates |
-| **AI Quality Validation** | GPT-4o-mini powered subtitle quality analysis |
+| **Multi-Agent Validation** | 4 specialized AI agents analyze subtitle quality in parallel |
+| **Weighted Quality Scoring** | Translation (40%), Technical (30%), Cultural (30%) |
 | **Human Approval Gate** | Review and approve/reject translations |
+| **Agent Chat** | Chat with specific agents for detailed feedback |
 | **Auto-Rejection** | Jobs auto-rejected after 3-day timeout |
 
 ## Project Structure
@@ -50,11 +52,14 @@ A cloud-native video translation service built on Azure that automatically trans
 ├── src/
 │   ├── Api/                    # Azure Durable Functions backend
 │   │   ├── Activities/         # Workflow activity functions
-│   │   ├── Agents/             # AI agents (SubtitleValidationAgent)
 │   │   ├── Functions/          # HTTP trigger functions
 │   │   ├── Models/             # Data models and DTOs
 │   │   ├── Orchestration/      # Durable orchestrator
-│   │   └── Services/           # Business logic services
+│   │   └── Services/           # Business logic & multi-agent services
+│   │       ├── MultiAgentValidationService.cs  # 4-agent parallel validation
+│   │       ├── FoundryAgentService.cs          # Azure AI Foundry integration
+│   │       ├── SpeechTranslationService.cs     # Speech API client
+│   │       └── BlobStorageService.cs           # Blob storage operations
 │   └── ui/                     # Blazor WebAssembly frontend
 │       ├── Pages/              # Razor pages (Dashboard, Create, Details, Reviews)
 │       ├── Models/             # Client-side models

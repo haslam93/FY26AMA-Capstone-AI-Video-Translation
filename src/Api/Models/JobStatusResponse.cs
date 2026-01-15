@@ -40,6 +40,16 @@ public class JobStatusResponse
     [JsonPropertyName("validationResult")]
     public SubtitleValidationResult? ValidationResult { get; set; }
 
+    [JsonPropertyName("validationThreadId")]
+    public string? ValidationThreadId { get; set; }
+
+    /// <summary>
+    /// Multi-agent validation result with per-agent scores.
+    /// This is populated when the multi-agent validation service is used.
+    /// </summary>
+    [JsonPropertyName("multiAgentValidation")]
+    public MultiAgentValidationResult? MultiAgentValidation { get; set; }
+
     [JsonPropertyName("error")]
     public string? Error { get; set; }
 
@@ -61,6 +71,8 @@ public class JobStatusResponse
             LastUpdatedAt = job.LastUpdatedAt,
             Result = job.Result,
             ValidationResult = job.ValidationResult,
+            ValidationThreadId = job.ValidationThreadId ?? job.MultiAgentValidation?.OrchestratorThreadId,
+            MultiAgentValidation = job.MultiAgentValidation,
             Error = job.Error
         };
     }
