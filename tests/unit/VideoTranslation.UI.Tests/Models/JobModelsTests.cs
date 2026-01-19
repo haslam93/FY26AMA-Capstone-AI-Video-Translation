@@ -168,4 +168,325 @@ public class JobModelsTests
         Assert.Equal("en-US", locale.Code);
         Assert.Equal("English (United States)", locale.Name);
     }
+
+    #region Multi-Agent Validation Tests
+
+    [Fact]
+    public void JobStatusResponse_HasMultiAgentValidation_ReturnsFalse_WhenNull()
+    {
+        // Arrange
+        var response = new JobStatusResponse
+        {
+            JobId = "job-123",
+            MultiAgentValidation = null
+        };
+
+        // Assert
+        Assert.False(response.HasMultiAgentValidation);
+    }
+
+    [Fact]
+    public void JobStatusResponse_HasMultiAgentValidation_ReturnsTrue_WhenSet()
+    {
+        // Arrange
+        var response = new JobStatusResponse
+        {
+            JobId = "job-123",
+            MultiAgentValidation = new MultiAgentValidationResult
+            {
+                OverallScore = 85,
+                Recommendation = "Approve"
+            }
+        };
+
+        // Assert
+        Assert.True(response.HasMultiAgentValidation);
+    }
+
+    [Fact]
+    public void MultiAgentValidationResult_DefaultValues_AreCorrect()
+    {
+        // Arrange & Act
+        var result = new MultiAgentValidationResult();
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Equal(0, result.OverallScore);
+        Assert.Equal("NeedsReview", result.Recommendation);
+        Assert.Equal(string.Empty, result.Summary);
+        Assert.Null(result.TranslationReview);
+        Assert.Null(result.TechnicalReview);
+        Assert.Null(result.CulturalReview);
+    }
+
+    [Fact]
+    public void MultiAgentValidationResult_CanSetAllAgentReviews()
+    {
+        // Arrange & Act
+        var result = new MultiAgentValidationResult
+        {
+            IsValid = true,
+            OverallScore = 85,
+            Recommendation = "Approve",
+            Summary = "High quality translation",
+            TranslationReview = new AgentReviewResult { Score = 90, AgentType = "translation" },
+            TechnicalReview = new AgentReviewResult { Score = 80, AgentType = "technical" },
+            CulturalReview = new AgentReviewResult { Score = 85, AgentType = "cultural" }
+        };
+
+        // Assert
+        Assert.True(result.IsValid);
+        Assert.Equal(85, result.OverallScore);
+        Assert.Equal("Approve", result.Recommendation);
+        Assert.NotNull(result.TranslationReview);
+        Assert.NotNull(result.TechnicalReview);
+        Assert.NotNull(result.CulturalReview);
+        Assert.Equal(90, result.TranslationReview.Score);
+        Assert.Equal(80, result.TechnicalReview.Score);
+        Assert.Equal(85, result.CulturalReview.Score);
+    }
+
+    [Fact]
+    public void AgentReviewResult_DefaultValues_AreCorrect()
+    {
+        // Arrange & Act
+        var review = new AgentReviewResult();
+
+        // Assert
+        Assert.Equal(string.Empty, review.AgentName);
+        Assert.Equal(string.Empty, review.AgentType);
+        Assert.Equal(0, review.Score);
+        Assert.Equal(string.Empty, review.Reasoning);
+        Assert.NotNull(review.Issues);
+        Assert.Empty(review.Issues);
+    }
+
+    [Fact]
+    public void AgentReviewResult_CanSetAllProperties()
+    {
+        // Arrange
+        var issues = new List<MultiAgentIssue>
+        {
+            new() { Description = "Test issue", Severity = "minor", Category = "translation" }
+        };
+
+        // Act
+        var review = new AgentReviewResult
+        {
+            AgentName = "TranslationReviewAgent",
+            AgentType = "translation",
+            Score = 85.5,
+            Reasoning = "Good translation quality",
+            Issues = issues,
+            ThreadId = "thread-123"
+        };
+
+        // Assert
+        Assert.Equal("TranslationReviewAgent", review.AgentName);
+        Assert.Equal("translation", review.AgentType);
+        Assert.Equal(85.5, review.Score);
+        Assert.Equal("Good translation quality", review.Reasoning);
+        Assert.Single(review.Issues);
+        Assert.Equal("thread-123", review.ThreadId);
+    }
+
+    [Fact]
+    public void MultiAgentIssue_DefaultValues_AreCorrect()
+    {
+        // Arrange & Act
+        var issue = new MultiAgentIssue();
+
+        // Assert
+        Assert.Equal("minor", issue.Severity);
+        Assert.Equal(string.Empty, issue.Category);
+        Assert.Equal(string.Empty, issue.Description);
+        Assert.Null(issue.Location);
+        Assert.Null(issue.Suggestion);
+    }
+
+    [Fact]
+    public void MultiAgentIssue_CanSetAllProperties()
+    {
+        // Act
+        var issue = new MultiAgentIssue
+        {
+            Severity = "critical",
+            Category = "translation",
+            Description = "Meaning lost in translation",
+            Location = "Cue 5, 00:01:23.000",
+            Suggestion = "Use 'greeting' instead of 'hello'"
+        };
+
+        // Assert
+        Assert.Equal("critical", issue.Severity);
+        Assert.Equal("translation", issue.Category);
+        Assert.Equal("Meaning lost in translation", issue.Description);
+        Assert.Equal("Cue 5, 00:01:23.000", issue.Location);
+        Assert.Equal("Use 'greeting' instead of 'hello'", issue.Suggestion);
+    }
+
+    [Fact]
+    public void MultiAgentValidationResult_CanSetThreadIds()
+    {
+        // Act
+        var result = new MultiAgentValidationResult
+        {
+            OrchestratorThreadId = "orch-thread-1",
+            TranslationAgentThreadId = "trans-thread-1",
+            TechnicalAgentThreadId = "tech-thread-1",
+            CulturalAgentThreadId = "cult-thread-1"
+        };
+
+        // Assert
+        Assert.Equal("orch-thread-1", result.OrchestratorThreadId);
+        Assert.Equal("trans-thread-1", result.TranslationAgentThreadId);
+        Assert.Equal("tech-thread-1", result.TechnicalAgentThreadId);
+        Assert.Equal("cult-thread-1", result.CulturalAgentThreadId);
+    }
+
+    #endregion
+
+    #region Chat and Approval Tests
+
+    [Fact]
+    public void ChatRequest_CanSetProperties()
+    {
+        // Act
+        var request = new ChatRequest
+        {
+            Message = "What issues were found?",
+            AgentType = "translation"
+        };
+
+        // Assert
+        Assert.Equal("What issues were found?", request.Message);
+        Assert.Equal("translation", request.AgentType);
+    }
+
+    [Fact]
+    public void ChatResponse_CanSetProperties()
+    {
+        // Act
+        var response = new ChatResponse
+        {
+            Message = "I found 3 translation issues...",
+            Timestamp = DateTime.UtcNow
+        };
+
+        // Assert
+        Assert.Equal("I found 3 translation issues...", response.Message);
+        Assert.True(response.Timestamp <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void ConversationMessage_CanSetAgentType()
+    {
+        // Act
+        var message = new ConversationMessage
+        {
+            Role = "assistant",
+            Content = "Analysis complete",
+            AgentType = "orchestrator"
+        };
+
+        // Assert
+        Assert.Equal("assistant", message.Role);
+        Assert.Equal("Analysis complete", message.Content);
+        Assert.Equal("orchestrator", message.AgentType);
+    }
+
+    [Fact]
+    public void ApprovalDecision_CanSetApproved()
+    {
+        // Act
+        var decision = new ApprovalDecision
+        {
+            Approved = true,
+            ReviewedBy = "reviewer@example.com",
+            Comments = "Looks good!"
+        };
+
+        // Assert
+        Assert.True(decision.Approved);
+        Assert.Equal("reviewer@example.com", decision.ReviewedBy);
+        Assert.Equal("Looks good!", decision.Comments);
+    }
+
+    [Fact]
+    public void ApprovalDecision_CanSetRejected()
+    {
+        // Act
+        var decision = new ApprovalDecision
+        {
+            Approved = false,
+            ReviewedBy = "reviewer@example.com",
+            Reason = "Poor translation quality"
+        };
+
+        // Assert
+        Assert.False(decision.Approved);
+        Assert.Equal("reviewer@example.com", decision.ReviewedBy);
+        Assert.Equal("Poor translation quality", decision.Reason);
+    }
+
+    [Fact]
+    public void PendingApprovalJob_CanSetProperties()
+    {
+        // Act
+        var job = new PendingApprovalJob
+        {
+            JobId = "job-123",
+            DisplayName = "Test Job",
+            SourceLocale = "en-US",
+            TargetLocale = "es-ES",
+            Status = "PendingApproval",
+            ApprovalRequestedAt = DateTime.UtcNow
+        };
+
+        // Assert
+        Assert.Equal("job-123", job.JobId);
+        Assert.Equal("Test Job", job.DisplayName);
+        Assert.Equal("en-US", job.SourceLocale);
+        Assert.Equal("es-ES", job.TargetLocale);
+        Assert.Equal("PendingApproval", job.Status);
+    }
+
+    #endregion
+
+    #region ValidationIssue Display Tests
+
+    [Theory]
+    [InlineData(0, "Low")]
+    [InlineData(1, "Medium")]
+    [InlineData(2, "High")]
+    [InlineData(3, "Critical")]
+    [InlineData(99, "Unknown")]
+    public void ValidationIssue_SeverityText_ReturnsCorrectValue(int severity, string expected)
+    {
+        // Arrange
+        var issue = new ValidationIssue { Severity = severity };
+
+        // Assert
+        Assert.Equal(expected, issue.SeverityText);
+    }
+
+    [Theory]
+    [InlineData(0, "Timing")]
+    [InlineData(1, "Grammar")]
+    [InlineData(2, "TranslationAccuracy")]
+    [InlineData(3, "CulturalContext")]
+    [InlineData(4, "Formatting")]
+    [InlineData(5, "ContentAppropriateness")]
+    [InlineData(6, "MissingContent")]
+    [InlineData(99, "Unknown")]
+    public void ValidationIssue_CategoryText_ReturnsCorrectValue(int category, string expected)
+    {
+        // Arrange
+        var issue = new ValidationIssue { Category = category };
+
+        // Assert
+        Assert.Equal(expected, issue.CategoryText);
+    }
+
+    #endregion
 }
